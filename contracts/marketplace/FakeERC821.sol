@@ -5,9 +5,14 @@ contract FakeERC821 {
   event Transfer(address indexed to, uint tokens);
 
   address holder = address(0);
+  address operator = address(0);
 
-  function setAssetHolder(address _holder) {
+  function setAssetHolder(address _holder) public {
     holder = _holder;
+  }
+
+  function setApprovedFor(address _operator) public {
+    operator = _operator;
   }
 
   function holderOf(uint256 assetId) public view returns (address) {
@@ -18,7 +23,7 @@ contract FakeERC821 {
     Transfer(_to, _assetId);
   }
   
-  function isApprovedFor(address operator, uint256 assetId) public view returns (bool) {
-    return (holder == operator);
+  function isApprovedFor(address _operator, uint256 _assetId) public view returns (bool) {
+    return (_operator == holder || _operator == operator);
   }
 }

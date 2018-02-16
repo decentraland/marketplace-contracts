@@ -54,8 +54,8 @@ contract Marketplace is Ownable {
         auctionList[assetId] = Auction({
             seller: nonFungibleRegistry.holderOf(assetId),
             price: priceInWei,
-            expiresAt: expiresAt,
-            startedAt: now
+            startedAt: now,
+            expiresAt: expiresAt
         });
 
         AuctionCreated(assetId, priceInWei, expiresAt);
@@ -75,9 +75,10 @@ contract Marketplace is Ownable {
     /// @param assetId - ID of the published NFT
     function executeOrder(uint256 assetId) public {
         address nonFungibleHolder = nonFungibleRegistry.holderOf(assetId);
-
+        
         require(nonFungibleRegistry.isApprovedFor(this, assetId));
-        require(nonFungibleHolder == auctionList[assetId].seller);
+        require(auctionList[assetId].seller == nonFungibleHolder);
+        require(auctionList[assetId].seller != msg.sender);
         require(now < auctionList[assetId].expiresAt);
 
         acceptedToken.transferFrom(

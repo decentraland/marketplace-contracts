@@ -1,28 +1,22 @@
 const BigNumber = web3.BigNumber
 
-const should = require('chai')
+require('chai')
   .use(require('chai-as-promised'))
   .use(require('chai-bignumber')(BigNumber))
   .should()
 
 const EVMThrow = 'invalid opcode'
+const EVMRevert = 'VM Exception while processing transaction: revert'
 
 const ERC20Mock = artifacts.require('FakeERC20')
 const ERC821Mock = artifacts.require('FakeERC821')
 const Marketplace = artifacts.require('Marketplace')
 
-const duration = {
-  seconds: function(val) { return val},
-  minutes: function(val) { return val * this.seconds(60) },
-  hours:   function(val) { return val * this.minutes(60) },
-  days:    function(val) { return val * this.hours(24) },
-  weeks:   function(val) { return val * this.days(7) },
-  years:   function(val) { return val * this.days(365)}
-}
+const { increaseTime, duration } = require('./helpers/increaseTime')
 
 contract('Marketplace', function ([_, owner, seller, buyer]) {
 
-  let endtime = ((new Date().getTime() + duration.days(15)) / 1000).toFixed(0)
+  let endtime = web3.eth.getBlock('latest').timestamp + duration.minutes(5)
   let assetId = 10000
 
   let mPlaceContract
@@ -31,11 +25,12 @@ contract('Marketplace', function ([_, owner, seller, buyer]) {
     let erc20 = await ERC20Mock.new({ from: owner })
     let erc821 = await ERC821Mock.new({ from: owner })
 
-    // Set holder of the asset 
-    await erc821.setAssetHolder(seller)
-
     // Create a Marketplace with mocks
     mPlaceContract = await Marketplace.new(erc20.address, erc821.address, { from: owner })
+
+    // Set holder of the asset and aproved on registry
+    await erc821.setAssetHolder(seller)
+    await erc821.setApprovedFor(mPlaceContract.address)
   })
 
   it('should create a new order', async function () {
@@ -45,7 +40,7 @@ contract('Marketplace', function ([_, owner, seller, buyer]) {
 
     let s = await mPlaceContract.auctionList(assetId)
 
-    s[0].should.be.equal('0x0000000000000000000000000000000000000000')
+    s[0].should.be.equal(seller)
     s[1].should.be.bignumber.equal(itemPrice)
     s[3].should.be.bignumber.equal(endtime)
 
@@ -53,13 +48,13 @@ contract('Marketplace', function ([_, owner, seller, buyer]) {
 
   it('should update an order', async function () {
     let newPrice = web3.toWei(2.0, 'ether')
-    let newEndTime = endtime + duration.days(5)
+    let newEndTime = endtime + duration.minutes(5)
 
     await mPlaceContract.createOrder(assetId, newPrice, newEndTime, { from: seller })
 
     let s = await mPlaceContract.auctionList(assetId)
 
-    s[0].should.be.equal('0x0000000000000000000000000000000000000000')
+    s[0].should.be.equal(seller)
     s[1].should.be.bignumber.equal(newPrice)
     s[3].should.be.bignumber.equal(newEndTime)
   })
@@ -67,31 +62,44 @@ contract('Marketplace', function ([_, owner, seller, buyer]) {
   // cancel
 
   it('should cancel a created order', async function () {
+    let itemPrice = web3.toWei(1.0, 'ether')
+
+    await mPlaceContract.createOrder(assetId, itemPrice, endtime, { from: seller })
     await mPlaceContract.cancelOrder(assetId, { from: seller })
   }) 
 
   it('should fail canceling an order', async function () {
-    await mPlaceContract.cancelOrder(assetId, { from: buyer })
+    let itemPrice = web3.toWei(1.0, 'ether')
+
+    await mPlaceContract.createOrder(assetId, itemPrice, endtime, { from: seller })
+    await mPlaceContract.cancelOrder(assetId, { from: buyer }).should.be.rejectedWith(EVMRevert)
   })
 
   // Execute
 
   it('should execute a created order', async function () {
-    await mPlaceContract.cancelOrder(assetId, { from: buyer })
+    let itemPrice = web3.toWei(1.0, 'ether')
 
+    await mPlaceContract.createOrder(assetId, itemPrice, endtime, { from: seller })
+    await mPlaceContract.executeOrder(assetId, { from: buyer })
   }) 
 
   it('should fail on execute a created order :: (wrong user)', async function () {
-    await mPlaceContract.cancelOrder(assetId, { from: seller })
+    let itemPrice = web3.toWei(1.0, 'ether')
 
+    await mPlaceContract.createOrder(assetId, itemPrice, endtime, { from: seller })
+    await mPlaceContract.executeOrder(assetId, { from: seller }).should.be.rejectedWith(EVMRevert)
   }) 
 
   it('should fail execute a created order :: (expired)', async function () {
-    await this.contract.cancelOrder(assetId, { from: seller })
+    let itemPrice = web3.toWei(1.0, 'ether')
 
+    await mPlaceContract.createOrder(assetId, itemPrice, endtime, { from: seller })
+
+    // move 10 mins ahead.
+    await increaseTime(600)
+    await mPlaceContract.executeOrder(assetId, { from: buyer }).should.be.rejectedWith(EVMRevert)
   }) 
-
-
   //
 })
   
