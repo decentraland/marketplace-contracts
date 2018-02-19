@@ -20,10 +20,12 @@ contract('Marketplace', function ([_, owner, seller, buyer]) {
   let assetId = 10000
 
   let mPlaceContract
+  let erc20
+  let erc821
 
   beforeEach(async function () {
-    let erc20 = await ERC20Mock.new({ from: owner })
-    let erc821 = await ERC821Mock.new({ from: owner })
+    erc20 = await ERC20Mock.new({ from: owner })
+    erc821 = await ERC821Mock.new({ from: owner })
 
     // Create a Marketplace with mocks
     mPlaceContract = await Marketplace.new(erc20.address, erc821.address, { from: owner })
@@ -100,6 +102,97 @@ contract('Marketplace', function ([_, owner, seller, buyer]) {
     await increaseTime(600)
     await mPlaceContract.executeOrder(assetId, { from: buyer }).should.be.rejectedWith(EVMRevert)
   }) 
-  //
-})
   
+  // Test change publication Fees. 
+  it('should change publication Fee', async function () {
+    let publicationFee = web3.toWei(0.005, 'ether')
+
+    await mPlaceContract.setPublicationFee(publicationFee, { from: owner })
+    let r = await mPlaceContract.publicationFeeInWei()
+    r.should.be.bignumber.equal(publicationFee)
+  }) 
+
+  it('should fail to change publication Fee (not owner)', async function () {
+    let publicationFee = web3.toWei(0.005, 'ether')
+
+    await mPlaceContract.setPublicationFee(publicationFee, { from: seller })
+      .should.be.rejectedWith(EVMRevert)
+  }) 
+
+  // Test owner sale cut.
+  it('should change owner sale cut', async function () {
+    let ownerCut = 10
+
+    await mPlaceContract.setOwnerCut(ownerCut, { from: owner })
+    let r = await mPlaceContract.ownerCutPercentage()
+    r.should.be.bignumber.equal(ownerCut)
+  }) 
+
+  it('should fail to change owner cut (% invalid)', async function () {
+    let ownerCut = 200
+
+    await mPlaceContract.setOwnerCut(ownerCut, { from: owner })
+      .should.be.rejectedWith(EVMRevert)
+  }) 
+
+  it('should fail to change owner cut (not owner)', async function () {
+    let ownerCut = 10
+
+    await mPlaceContract.setOwnerCut(ownerCut, { from: seller })
+      .should.be.rejectedWith(EVMRevert)
+  }) 
+
+  // Test publish with fee.
+
+  it('should publish with fee', async function () {
+    // Set token balances 
+    erc20.setBalance(owner, web3.toWei(10.0, 'ether'))
+    erc20.setBalance(seller, web3.toWei(10.0, 'ether'))
+
+    let itemPrice = web3.toWei(1.0, 'ether')
+    let publicationFee = web3.toWei(0.5, 'ether')
+
+    let newEndtime = web3.eth.getBlock('latest').timestamp + duration.minutes(5)
+
+    await mPlaceContract.setPublicationFee(publicationFee, { from: owner })
+    await mPlaceContract.createOrder(assetId, itemPrice, newEndtime, { from: seller })
+
+    let balancePost = await erc20.balanceOf(seller)
+    
+    balancePost.should.be.bignumber.equal(
+      web3.toWei(9.5, 'ether')
+    )
+  }) 
+
+  it('should sell with owner sale cut', async function () {
+    // Set token balances 
+    erc20.setBalance(owner, web3.toWei(10.0, 'ether'))
+    erc20.setBalance(buyer, web3.toWei(10.0, 'ether'))
+    erc20.setBalance(seller, web3.toWei(10.0, 'ether'))
+
+    let ownerCut = 10
+    let itemPrice = web3.toWei(1.0, 'ether')
+    let newEndtime = web3.eth.getBlock('latest').timestamp + duration.minutes(5)
+
+    await mPlaceContract.setOwnerCut(ownerCut, { from: owner })
+    await mPlaceContract.createOrder(assetId, itemPrice, newEndtime, { from: seller })
+    await mPlaceContract.executeOrder(assetId, { from: buyer })
+
+    // Verify balances
+    let ownerBalance = await erc20.balanceOf(owner)
+    ownerBalance.should.be.bignumber.equal(
+      web3.toWei(10.1, 'ether')
+    )
+
+    let sellerBalance = await erc20.balanceOf(seller)    
+    sellerBalance.should.be.bignumber.equal(
+      web3.toWei(10.9, 'ether')
+    )
+        
+    let buyerBalance = await erc20.balanceOf(buyer)    
+    buyerBalance.should.be.bignumber.equal(
+      web3.toWei(9.0, 'ether')
+    )
+  }) 
+
+})

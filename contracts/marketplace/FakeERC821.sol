@@ -2,7 +2,7 @@ pragma solidity ^0.4.18;
 
 contract FakeERC821 {
 
-  event Transfer(address indexed to, uint tokens);
+  event Transfer(address indexed to, uint assetId);
 
   address holder = address(0);
   address operator = address(0);
