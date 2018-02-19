@@ -114,12 +114,14 @@ contract Marketplace is Ownable {
     /// @dev Executes the sale for a published NTF 
     /// @param assetId - ID of the published NFT
     function executeOrder(uint256 assetId) public {
-        address nonFungibleHolder = nonFungibleRegistry.holderOf(assetId);
-        
-        require(nonFungibleRegistry.isApprovedFor(this, assetId));
-        require(auctionList[assetId].seller == nonFungibleHolder);
+        require(auctionList[assetId].seller != address(0));
         require(auctionList[assetId].seller != msg.sender);
         require(now < auctionList[assetId].expiresAt);
+
+        address nonFungibleHolder = nonFungibleRegistry.holderOf(assetId);
+        
+        require(auctionList[assetId].seller == nonFungibleHolder);
+        require(nonFungibleRegistry.isApprovedFor(this, assetId));
 
         uint saleShareAmount = 0;
 
