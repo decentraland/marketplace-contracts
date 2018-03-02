@@ -1,7 +1,96 @@
 pragma solidity 0.4.18;
 
-import "zeppelin-solidity/contracts/ownership/Ownable.sol";
-import "zeppelin-solidity/contracts/math/SafeMath.sol";
+// File: zeppelin-solidity/contracts/math/SafeMath.sol
+
+/**
+ * @title SafeMath
+ * @dev Math operations with safety checks that throw on error
+ */
+library SafeMath {
+
+  /**
+  * @dev Multiplies two numbers, throws on overflow.
+  */
+  function mul(uint256 a, uint256 b) internal pure returns (uint256) {
+    if (a == 0) {
+      return 0;
+    }
+    uint256 c = a * b;
+    assert(c / a == b);
+    return c;
+  }
+
+  /**
+  * @dev Integer division of two numbers, truncating the quotient.
+  */
+  function div(uint256 a, uint256 b) internal pure returns (uint256) {
+    // assert(b > 0); // Solidity automatically throws when dividing by 0
+    uint256 c = a / b;
+    // assert(a == b * c + a % b); // There is no case in which this doesn't hold
+    return c;
+  }
+
+  /**
+  * @dev Substracts two numbers, throws on overflow (i.e. if subtrahend is greater than minuend).
+  */
+  function sub(uint256 a, uint256 b) internal pure returns (uint256) {
+    assert(b <= a);
+    return a - b;
+  }
+
+  /**
+  * @dev Adds two numbers, throws on overflow.
+  */
+  function add(uint256 a, uint256 b) internal pure returns (uint256) {
+    uint256 c = a + b;
+    assert(c >= a);
+    return c;
+  }
+}
+
+// File: zeppelin-solidity/contracts/ownership/Ownable.sol
+
+/**
+ * @title Ownable
+ * @dev The Ownable contract has an owner address, and provides basic authorization control
+ * functions, this simplifies the implementation of "user permissions".
+ */
+contract Ownable {
+  address public owner;
+
+
+  event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
+
+
+  /**
+   * @dev The Ownable constructor sets the original `owner` of the contract to the sender
+   * account.
+   */
+  function Ownable() public {
+    owner = msg.sender;
+  }
+
+  /**
+   * @dev Throws if called by any account other than the owner.
+   */
+  modifier onlyOwner() {
+    require(msg.sender == owner);
+    _;
+  }
+
+  /**
+   * @dev Allows the current owner to transfer control of the contract to a newOwner.
+   * @param newOwner The address to transfer ownership to.
+   */
+  function transferOwnership(address newOwner) public onlyOwner {
+    require(newOwner != address(0));
+    OwnershipTransferred(owner, newOwner);
+    owner = newOwner;
+  }
+
+}
+
+// File: contracts/marketplace/Marketplace.sol
 
 /**
  * @title Interface for contracts conforming to ERC-20
@@ -41,7 +130,7 @@ contract Marketplace is Ownable {
     uint256 public ownerCutPercentage;
     uint256 public publicationFeeInWei;
 
-    /* EVENTS */
+    /* EVENTS */    
     event AuctionCreated(uint256 indexed assetId, uint256 priceInWei, uint256 expiresAt);
     event AuctionSuccessful(uint256 indexed assetId, uint256 totalPrice, address indexed winner);
     event AuctionCancelled(uint256 indexed assetId);
@@ -73,7 +162,7 @@ contract Marketplace is Ownable {
     /**
      * @dev Sets the share cut for the owner of the contract that's
      *  charged to the seller on a successful sale.
-     * @param ownerCut - Share amount, from 0 to 100
+     * @param ownerCut - Share amount, from 0 to 100 
      */
     function setOwnerCut(uint8 ownerCut) onlyOwner public {
         require(ownerCut < 100);
@@ -87,7 +176,7 @@ contract Marketplace is Ownable {
      * @dev Cancel an already published order
      * @param assetId - ID of the published NFT
      * @param priceInWei - Price in Wei for the supported coin.
-     * @param expiresAt - Duration of the auction (in hours)
+     * @param expiresAt - Duration of the auction (in hours)    
      */
     function createOrder(uint256 assetId, uint256 priceInWei, uint256 expiresAt) public {
         require(nonFungibleRegistry.isApprovedFor(msg.sender, assetId));
@@ -101,11 +190,11 @@ contract Marketplace is Ownable {
             expiresAt: expiresAt
         });
 
-        // Check if there's a publication fee and
+        // Check if there's a publication fee and 
         // transfeer the amount to marketplace owner.
         if (publicationFeeInWei > 0) {
             acceptedToken.transferFrom(
-                msg.sender,
+                msg.sender, 
                 owner,
                 publicationFeeInWei
             );
@@ -116,19 +205,19 @@ contract Marketplace is Ownable {
 
     /**
      * @dev Cancel an already published order
-     *  can only be canceled by seller or the contract owner.
+     *  can only be canceled by seller or the contract owner. 
      * @param assetId - ID of the published NFT
      */
     function cancelOrder(uint256 assetId) public {
         require(auctionList[assetId].seller == msg.sender || msg.sender == owner);
 
         delete auctionList[assetId];
-
+        
         AuctionCancelled(assetId);
     }
 
     /**
-     * @dev Executes the sale for a published NTF
+     * @dev Executes the sale for a published NTF 
      * @param assetId - ID of the published NFT
      */
     function executeOrder(uint256 assetId, uint256 price) public {
@@ -137,32 +226,32 @@ contract Marketplace is Ownable {
         require(now < auctionList[assetId].expiresAt);
 
         address nonFungibleHolder = nonFungibleRegistry.ownerOf(assetId);
-
+        
         require(auctionList[assetId].seller == nonFungibleHolder);
 
         uint saleShareAmount = 0;
 
         if (ownerCutPercentage > 0) {
-
-            // Calculate sale share
+            
+            // Calculate sale share   
             saleShareAmount = auctionList[assetId].price.mul(ownerCutPercentage).div(100);
-
-            // Transfer share amount for marketplace Owner.
+            
+            // Transfer share amount for marketplace Owner. 
             acceptedToken.transferFrom(
-                msg.sender,
-                owner,
+                msg.sender, 
+                owner, 
                 saleShareAmount
             );
         }
 
         // Transfer sale amount to seller
         acceptedToken.transferFrom(
-            msg.sender,
-            nonFungibleHolder,
+            msg.sender, 
+            nonFungibleHolder, 
             auctionList[assetId].price.sub(saleShareAmount)
         );
 
-        // Transfer asset owner
+        // Transfer asset owner 
         nonFungibleRegistry.safeTransferFrom(
             auctionList[assetId].seller,
             msg.sender,
