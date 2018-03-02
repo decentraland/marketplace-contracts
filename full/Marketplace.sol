@@ -111,8 +111,8 @@ contract ERC721Interface {
 contract Marketplace is Ownable {
     using SafeMath for uint256;
 
-    ERC20Interface acceptedToken;
-    ERC721Interface nonFungibleRegistry;
+    ERC20Interface public acceptedToken;
+    ERC721Interface public nonFungibleRegistry;
 
     struct Auction {
         // Owner of the NFT
