@@ -23,7 +23,7 @@ contract Marketplace is Ownable {
     using SafeMath for uint256;
 
     ERC20Interface acceptedToken;
-    ERC821Interface nonFungibleRegistry;
+    ERC721Interface nonFungibleRegistry;
 
     struct Auction {
         // Owner of the NFT
@@ -53,11 +53,11 @@ contract Marketplace is Ownable {
     /**
      * @dev Constructor for this contract.
      * @param _acceptedToken - Address of the ERC20 accepted for this marketplace
-     * @param _nonFungibleRegistry - Address of the ERC821 registry contract.
+     * @param _nonFungibleRegistry - Address of the ERC721 registry contract.
      */
     function Marketplace(address _acceptedToken, address _nonFungibleRegistry) public {
         acceptedToken = ERC20Interface(_acceptedToken);
-        nonFungibleRegistry = ERC821Interface(_nonFungibleRegistry);
+        nonFungibleRegistry = ERC721Interface(_nonFungibleRegistry);
     }
 
     /**
@@ -134,6 +134,7 @@ contract Marketplace is Ownable {
     function executeOrder(uint256 assetId, uint256 price) public {
         require(auctionList[assetId].seller != address(0));
         require(auctionList[assetId].seller != msg.sender);
+        require(auctionList[assetId].price == price);
         require(now < auctionList[assetId].expiresAt);
 
         address nonFungibleHolder = nonFungibleRegistry.ownerOf(assetId);

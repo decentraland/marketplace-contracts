@@ -112,7 +112,7 @@ contract Marketplace is Ownable {
     using SafeMath for uint256;
 
     ERC20Interface acceptedToken;
-    ERC821Interface nonFungibleRegistry;
+    ERC721Interface nonFungibleRegistry;
 
     struct Auction {
         // Owner of the NFT
@@ -130,7 +130,7 @@ contract Marketplace is Ownable {
     uint256 public ownerCutPercentage;
     uint256 public publicationFeeInWei;
 
-    /* EVENTS */    
+    /* EVENTS */
     event AuctionCreated(uint256 indexed assetId, uint256 priceInWei, uint256 expiresAt);
     event AuctionSuccessful(uint256 indexed assetId, uint256 totalPrice, address indexed winner);
     event AuctionCancelled(uint256 indexed assetId);
@@ -142,11 +142,11 @@ contract Marketplace is Ownable {
     /**
      * @dev Constructor for this contract.
      * @param _acceptedToken - Address of the ERC20 accepted for this marketplace
-     * @param _nonFungibleRegistry - Address of the ERC821 registry contract.
+     * @param _nonFungibleRegistry - Address of the ERC721 registry contract.
      */
     function Marketplace(address _acceptedToken, address _nonFungibleRegistry) public {
         acceptedToken = ERC20Interface(_acceptedToken);
-        nonFungibleRegistry = ERC821Interface(_nonFungibleRegistry);
+        nonFungibleRegistry = ERC721Interface(_nonFungibleRegistry);
     }
 
     /**
@@ -162,7 +162,7 @@ contract Marketplace is Ownable {
     /**
      * @dev Sets the share cut for the owner of the contract that's
      *  charged to the seller on a successful sale.
-     * @param ownerCut - Share amount, from 0 to 100 
+     * @param ownerCut - Share amount, from 0 to 100
      */
     function setOwnerCut(uint8 ownerCut) onlyOwner public {
         require(ownerCut < 100);
@@ -176,7 +176,7 @@ contract Marketplace is Ownable {
      * @dev Cancel an already published order
      * @param assetId - ID of the published NFT
      * @param priceInWei - Price in Wei for the supported coin.
-     * @param expiresAt - Duration of the auction (in hours)    
+     * @param expiresAt - Duration of the auction (in hours)
      */
     function createOrder(uint256 assetId, uint256 priceInWei, uint256 expiresAt) public {
         require(nonFungibleRegistry.isApprovedFor(msg.sender, assetId));
@@ -190,11 +190,11 @@ contract Marketplace is Ownable {
             expiresAt: expiresAt
         });
 
-        // Check if there's a publication fee and 
+        // Check if there's a publication fee and
         // transfeer the amount to marketplace owner.
         if (publicationFeeInWei > 0) {
             acceptedToken.transferFrom(
-                msg.sender, 
+                msg.sender,
                 owner,
                 publicationFeeInWei
             );
@@ -205,53 +205,54 @@ contract Marketplace is Ownable {
 
     /**
      * @dev Cancel an already published order
-     *  can only be canceled by seller or the contract owner. 
+     *  can only be canceled by seller or the contract owner.
      * @param assetId - ID of the published NFT
      */
     function cancelOrder(uint256 assetId) public {
         require(auctionList[assetId].seller == msg.sender || msg.sender == owner);
 
         delete auctionList[assetId];
-        
+
         AuctionCancelled(assetId);
     }
 
     /**
-     * @dev Executes the sale for a published NTF 
+     * @dev Executes the sale for a published NTF
      * @param assetId - ID of the published NFT
      */
     function executeOrder(uint256 assetId, uint256 price) public {
         require(auctionList[assetId].seller != address(0));
         require(auctionList[assetId].seller != msg.sender);
+        require(auctionList[assetId].price == price);
         require(now < auctionList[assetId].expiresAt);
 
         address nonFungibleHolder = nonFungibleRegistry.ownerOf(assetId);
-        
+
         require(auctionList[assetId].seller == nonFungibleHolder);
 
         uint saleShareAmount = 0;
 
         if (ownerCutPercentage > 0) {
-            
-            // Calculate sale share   
+
+            // Calculate sale share
             saleShareAmount = auctionList[assetId].price.mul(ownerCutPercentage).div(100);
-            
-            // Transfer share amount for marketplace Owner. 
+
+            // Transfer share amount for marketplace Owner.
             acceptedToken.transferFrom(
-                msg.sender, 
-                owner, 
+                msg.sender,
+                owner,
                 saleShareAmount
             );
         }
 
         // Transfer sale amount to seller
         acceptedToken.transferFrom(
-            msg.sender, 
-            nonFungibleHolder, 
+            msg.sender,
+            nonFungibleHolder,
             auctionList[assetId].price.sub(saleShareAmount)
         );
 
-        // Transfer asset owner 
+        // Transfer asset owner
         nonFungibleRegistry.safeTransferFrom(
             auctionList[assetId].seller,
             msg.sender,
