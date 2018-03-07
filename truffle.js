@@ -3,7 +3,6 @@ const mnemonic = 'salon state regret wet bounce color cactus setup tunnel preven
 
 module.exports = {
   networks: {
-    
     local: {
       host: 'localhost',
       port: 8545,

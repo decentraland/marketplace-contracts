@@ -1,6 +1,6 @@
 pragma solidity ^0.4.18;
 
-contract FakeERC821 {
+contract FakeERC721 {
 
   event Transfer(address indexed to, uint assetId);
 
@@ -11,19 +11,19 @@ contract FakeERC821 {
     holder = _holder;
   }
 
-  function setApprovedFor(address _operator) public {
+  function setApprovalForAll(address _operator, bool _approved) public {
     operator = _operator;
   }
 
-  function holderOf(uint256 assetId) public view returns (address) {
+  function ownerOf(uint256 assetId) public view returns (address) {
     return holder;
   }
 
-  function transfer(address _to, uint256 _assetId) public {
+  function transferFrom(address _from, address _to, uint256 _assetId) public {
     Transfer(_to, _assetId);
   }
   
-  function isApprovedFor(address _operator, uint256 _assetId) public view returns (bool) {
+  function isAuthorized(address _operator, uint256 _assetId) public view returns (bool) {
     return (_operator == holder || _operator == operator);
   }
 }

@@ -1,4 +1,4 @@
-pragma solidity 0.4.18;
+pragma solidity 0.4.19;
 
 import "zeppelin-solidity/contracts/ownership/Ownable.sol";
 import "zeppelin-solidity/contracts/math/SafeMath.sol";
@@ -16,7 +16,7 @@ contract ERC20Interface {
 contract ERC721Interface {
     function ownerOf(uint256 assetId) public view returns (address);
     function safeTransferFrom(address from, address to, uint256 assetId) public;
-    function isApprovedFor(address operator, uint256 assetId) public view returns (bool);
+    function isAuthorized(address operator, uint256 assetId) public view returns (bool);
 }
 
 contract Marketplace is Ownable {
@@ -42,7 +42,7 @@ contract Marketplace is Ownable {
     uint256 public publicationFeeInWei;
 
     /* EVENTS */
-    event AuctionCreated(uint256 indexed assetId, uint256 priceInWei, uint256 expiresAt);
+    event AuctionCreated(uint256 indexed assetId, address indexed owner, uint256 priceInWei, uint256 expiresAt);
     event AuctionSuccessful(uint256 indexed assetId, uint256 totalPrice, address indexed winner);
     event AuctionCancelled(uint256 indexed assetId);
 
@@ -90,7 +90,8 @@ contract Marketplace is Ownable {
      * @param expiresAt - Duration of the auction (in hours)
      */
     function createOrder(uint256 assetId, uint256 priceInWei, uint256 expiresAt) public {
-        require(nonFungibleRegistry.isApprovedFor(msg.sender, assetId));
+        require(nonFungibleRegistry.isAuthorized(msg.sender, assetId));
+        require(nonFungibleRegistry.isAuthorized(address(this), assetId));
         require(priceInWei > 0);
         require(expiresAt > now.add(1 minutes));
 
@@ -102,7 +103,7 @@ contract Marketplace is Ownable {
         });
 
         // Check if there's a publication fee and
-        // transfeer the amount to marketplace owner.
+        // transfer the amount to marketplace owner.
         if (publicationFeeInWei > 0) {
             acceptedToken.transferFrom(
                 msg.sender,
@@ -111,7 +112,7 @@ contract Marketplace is Ownable {
             );
         }
 
-        AuctionCreated(assetId, priceInWei, expiresAt);
+        AuctionCreated(assetId, msg.sender, priceInWei, expiresAt);
     }
 
     /**
