@@ -27,17 +27,17 @@ contract('Marketplace', function([_, owner, seller, buyer]) {
     erc721 = await ERC721Mock.new({ from: owner })
 
     // Create a Marketplace with mocks
-    market = await Marketplace.new(erc20, erc721, {
+    market = await Marketplace.new(erc20.address, erc721.address, {
       from: owner
     })
 
     // Set holder of the asset and aproved on registry
     await erc721.setAssetHolder(seller)
-    await erc721.setApprovalForAll(market.address)
+    await erc721.setApprovalForAll(market.address, true)
   })
 
   it('should create a new order', async function() {
-    let itemPrice = web3.toWei(1.0, 'ether')
+    let itemPrice = web3.toWei(1, 'ether')
 
     await market.createOrder(assetId, itemPrice, endtime, {
       from: seller

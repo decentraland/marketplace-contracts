@@ -19,11 +19,11 @@ contract FakeERC721 {
     return holder;
   }
 
-  function transferFrom(address _from, address _to, uint256 _assetId) public {
+  function safeTransferFrom(address _from, address _to, uint256 _assetId) public {
     Transfer(_to, _assetId);
   }
   
-  function isAuthorized(address _operator, uint256 _assetId) public view returns (bool) {
+  function isAuthorized(address _operator, uint256) public view returns (bool) {
     return (_operator == holder || _operator == operator);
   }
 }
