@@ -14,8 +14,16 @@ const Marketplace = artifacts.require('Marketplace')
 
 const { increaseTime, duration } = require('./helpers/increaseTime')
 
+function checkAuctionCreatedLog(log, assetId, seller, priceInWei, expiresAt) {
+  log.event.should.be.eq('AuctionCreated')
+  log.args.assetId.should.be.bignumber.equal(assetId)
+  log.args.seller.should.be.equal(seller)
+  log.args.priceInWei.should.be.bignumber.equal(priceInWei)
+  log.args.expiresAt.should.be.bignumber.equal(expiresAt)
+}
+
 contract('Marketplace', function([_, owner, seller, buyer]) {
-  let endtime = web3.eth.getBlock('latest').timestamp + duration.minutes(5)
+  let endTime = web3.eth.getBlock('latest').timestamp + duration.minutes(5)
   let assetId = 10000
 
   let market
@@ -36,23 +44,29 @@ contract('Marketplace', function([_, owner, seller, buyer]) {
     await erc721.setApprovalForAll(market.address, true)
   })
 
+  // Create
+
   it('should create a new order', async function() {
     let itemPrice = web3.toWei(1, 'ether')
 
-    await market.createOrder(assetId, itemPrice, endtime, {
+    const { logs } = await market.createOrder(assetId, itemPrice, endTime, {
       from: seller
     })
 
-    let s = await market.auctionList(assetId)
+    // Event emitted
+    logs.length.should.be.equal(1)
+    checkAuctionCreatedLog(logs[0], assetId, seller, itemPrice, endTime)
 
-    s[0].should.be.equal(seller)
-    s[1].should.be.bignumber.equal(itemPrice)
-    s[3].should.be.bignumber.equal(endtime)
+    // Check Data
+    let s = await market.auctionList(assetId)
+    s[1].should.be.equal(seller)
+    s[2].should.be.bignumber.equal(itemPrice)
+    s[4].should.be.bignumber.equal(endTime)
   })
 
   it('should update an order', async function() {
     let newPrice = web3.toWei(2.0, 'ether')
-    let newEndTime = endtime + duration.minutes(5)
+    let newEndTime = endTime + duration.minutes(5)
 
     await market.createOrder(assetId, newPrice, newEndTime, {
       from: seller
@@ -60,17 +74,17 @@ contract('Marketplace', function([_, owner, seller, buyer]) {
 
     let s = await market.auctionList(assetId)
 
-    s[0].should.be.equal(seller)
-    s[1].should.be.bignumber.equal(newPrice)
-    s[3].should.be.bignumber.equal(newEndTime)
+    s[1].should.be.equal(seller)
+    s[2].should.be.bignumber.equal(newPrice)
+    s[4].should.be.bignumber.equal(newEndTime)
   })
 
-  // cancel
+  // Cancel
 
   it('should cancel a created order', async function() {
     let itemPrice = web3.toWei(1.0, 'ether')
 
-    await market.createOrder(assetId, itemPrice, endtime, {
+    await market.createOrder(assetId, itemPrice, endTime, {
       from: seller
     })
     await market.cancelOrder(assetId, { from: seller })
@@ -79,7 +93,7 @@ contract('Marketplace', function([_, owner, seller, buyer]) {
   it('should fail canceling an order', async function() {
     let itemPrice = web3.toWei(1.0, 'ether')
 
-    await market.createOrder(assetId, itemPrice, endtime, {
+    await market.createOrder(assetId, itemPrice, endTime, {
       from: seller
     })
     await market
@@ -92,7 +106,7 @@ contract('Marketplace', function([_, owner, seller, buyer]) {
   it('should execute a created order', async function() {
     let itemPrice = web3.toWei(1.0, 'ether')
 
-    await market.createOrder(assetId, itemPrice, endtime, {
+    await market.createOrder(assetId, itemPrice, endTime, {
       from: seller
     })
     await market.executeOrder(assetId, itemPrice, { from: buyer })
@@ -101,7 +115,7 @@ contract('Marketplace', function([_, owner, seller, buyer]) {
   it('should fail on execute a created order :: (wrong user)', async function() {
     let itemPrice = web3.toWei(1.0, 'ether')
 
-    await market.createOrder(assetId, itemPrice, endtime, {
+    await market.createOrder(assetId, itemPrice, endTime, {
       from: seller
     })
     await market
@@ -112,7 +126,7 @@ contract('Marketplace', function([_, owner, seller, buyer]) {
   it('should fail execute a created order :: (expired)', async function() {
     let itemPrice = web3.toWei(1.0, 'ether')
 
-    await market.createOrder(assetId, itemPrice, endtime, {
+    await market.createOrder(assetId, itemPrice, endTime, {
       from: seller
     })
 
@@ -165,7 +179,7 @@ contract('Marketplace', function([_, owner, seller, buyer]) {
       .should.be.rejectedWith(EVMRevert)
   })
 
-  // Test publish with fee.
+  // Test publish with fee
 
   it('should publish with fee', async function() {
     // Set token balances
