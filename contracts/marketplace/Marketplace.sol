@@ -155,13 +155,11 @@ contract Marketplace is Ownable {
     function cancelOrder(uint256 assetId) public {
         require(auctionList[assetId].seller == msg.sender || msg.sender == owner);
 
+        bytes32 auctionId = auctionList[assetId].id;
+        address auctionSeller = auctionList[assetId].seller;
         delete auctionList[assetId];
 
-        AuctionCancelled(
-            auctionList[assetId].id,
-            assetId,
-            auctionList[assetId].seller
-        );
+        AuctionCancelled(auctionId, assetId, auctionSeller);
     }
 
     /**
@@ -207,14 +205,12 @@ contract Marketplace is Ownable {
             assetId
         );
 
+
+        bytes32 auctionId = auctionList[assetId].id;
+        address auctionSeller = auctionList[assetId].seller;
+        uint256 auctionPrice = auctionList[assetId].price;
         delete auctionList[assetId];
 
-        AuctionSuccessful(
-            auctionList[assetId].id, 
-            assetId, 
-            auctionList[assetId].seller, 
-            auctionList[assetId].price, 
-            msg.sender
-        );
+        AuctionSuccessful(auctionId, assetId, auctionSeller, auctionPrice, msg.sender);
     }
  }
