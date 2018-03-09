@@ -59,9 +59,9 @@ contract('Marketplace', function([_, owner, seller, buyer]) {
 
     // Check Data
     let s = await market.auctionList(assetId)
-    s[0].should.be.equal(seller)
-    s[1].should.be.bignumber.equal(itemPrice)
-    s[3].should.be.bignumber.equal(endTime)
+    s[1].should.be.equal(seller)
+    s[2].should.be.bignumber.equal(itemPrice)
+    s[4].should.be.bignumber.equal(endTime)
   })
 
   it('should update an order', async function() {
@@ -74,9 +74,9 @@ contract('Marketplace', function([_, owner, seller, buyer]) {
 
     let s = await market.auctionList(assetId)
 
-    s[0].should.be.equal(seller)
-    s[1].should.be.bignumber.equal(newPrice)
-    s[3].should.be.bignumber.equal(newEndTime)
+    s[1].should.be.equal(seller)
+    s[2].should.be.bignumber.equal(newPrice)
+    s[4].should.be.bignumber.equal(newEndTime)
   })
 
   // Cancel
