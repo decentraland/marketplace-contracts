@@ -22,6 +22,20 @@ function checkAuctionCreatedLog(log, assetId, seller, priceInWei, expiresAt) {
   log.args.expiresAt.should.be.bignumber.equal(expiresAt)
 }
 
+function checkAuctionCancelledLog(log, assetId, seller) {
+  log.event.should.be.eq('AuctionCancelled')
+  log.args.assetId.should.be.bignumber.equal(assetId)
+  log.args.seller.should.be.equal(seller)
+}
+
+function checkAuctionSuccessfulLog(log, assetId, seller, totalPrice, winner) {
+  log.event.should.be.eq('AuctionSuccessful')
+  log.args.assetId.should.be.bignumber.equal(assetId)
+  log.args.seller.should.be.equal(seller)
+  log.args.totalPrice.should.be.bignumber.equal(totalPrice)
+  log.args.winner.should.be.equal(winner)
+}
+
 contract('Marketplace', function([_, owner, seller, buyer]) {
   let endTime = web3.eth.getBlock('latest').timestamp + duration.minutes(5)
   let assetId = 10000
@@ -57,7 +71,7 @@ contract('Marketplace', function([_, owner, seller, buyer]) {
     logs.length.should.be.equal(1)
     checkAuctionCreatedLog(logs[0], assetId, seller, itemPrice, endTime)
 
-    // Check Data
+    // Check data
     let s = await market.auctionList(assetId)
     s[1].should.be.equal(seller)
     s[2].should.be.bignumber.equal(itemPrice)
@@ -68,12 +82,16 @@ contract('Marketplace', function([_, owner, seller, buyer]) {
     let newPrice = web3.toWei(2.0, 'ether')
     let newEndTime = endTime + duration.minutes(5)
 
-    await market.createOrder(assetId, newPrice, newEndTime, {
+    const { logs } = await market.createOrder(assetId, newPrice, newEndTime, {
       from: seller
     })
 
-    let s = await market.auctionList(assetId)
+    // Event emitted
+    logs.length.should.be.equal(1)
+    checkAuctionCreatedLog(logs[0], assetId, seller, newPrice, newEndTime)
 
+    // Check data
+    let s = await market.auctionList(assetId)
     s[1].should.be.equal(seller)
     s[2].should.be.bignumber.equal(newPrice)
     s[4].should.be.bignumber.equal(newEndTime)
@@ -87,7 +105,11 @@ contract('Marketplace', function([_, owner, seller, buyer]) {
     await market.createOrder(assetId, itemPrice, endTime, {
       from: seller
     })
-    await market.cancelOrder(assetId, { from: seller })
+    const { logs } = await market.cancelOrder(assetId, { from: seller })
+
+    // Event emitted
+    logs.length.should.be.equal(1)
+    checkAuctionCancelledLog(logs[0], assetId, seller)
   })
 
   it('should fail canceling an order', async function() {
@@ -109,7 +131,11 @@ contract('Marketplace', function([_, owner, seller, buyer]) {
     await market.createOrder(assetId, itemPrice, endTime, {
       from: seller
     })
-    await market.executeOrder(assetId, itemPrice, { from: buyer })
+    const { logs } = await market.executeOrder(assetId, itemPrice, { from: buyer })
+
+    // Event emitted
+    logs.length.should.be.equal(1)
+    checkAuctionSuccessfulLog(logs[0], assetId, seller, itemPrice, buyer)
   })
 
   it('should fail on execute a created order :: (wrong user)', async function() {
