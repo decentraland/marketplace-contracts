@@ -42,9 +42,9 @@ contract Marketplace is Ownable {
     uint256 public publicationFeeInWei;
 
     /* EVENTS */
-    event AuctionCreated(uint256 indexed assetId, address indexed owner, uint256 priceInWei, uint256 expiresAt);
-    event AuctionSuccessful(uint256 indexed assetId, uint256 totalPrice, address indexed winner);
-    event AuctionCancelled(uint256 indexed assetId);
+    event AuctionCreated(uint256 indexed assetId, address indexed seller, uint256 priceInWei, uint256 expiresAt);
+    event AuctionSuccessful(uint256 indexed assetId, address indexed seller, uint256 totalPrice, address indexed winner);
+    event AuctionCancelled(uint256 indexed assetId, address indexed seller);
 
     event ChangedPublicationFee(uint256 publicationFee);
     event ChangedOwnerCut(uint256 ownerCut);
@@ -112,7 +112,7 @@ contract Marketplace is Ownable {
             );
         }
 
-        AuctionCreated(assetId, msg.sender, priceInWei, expiresAt);
+        AuctionCreated(assetId, auctionList[assetId].seller, priceInWei, expiresAt);
     }
 
     /**
@@ -125,7 +125,7 @@ contract Marketplace is Ownable {
 
         delete auctionList[assetId];
 
-        AuctionCancelled(assetId);
+        AuctionCancelled(assetId, auctionList[assetId].seller);
     }
 
     /**
@@ -173,6 +173,6 @@ contract Marketplace is Ownable {
 
         delete auctionList[assetId];
 
-        AuctionSuccessful(assetId, auctionList[assetId].price, msg.sender);
+        AuctionSuccessful(assetId, auctionList[assetId].seller, auctionList[assetId].price, msg.sender);
     }
  }
