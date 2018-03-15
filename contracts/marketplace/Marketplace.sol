@@ -26,8 +26,8 @@ contract Marketplace is Ownable {
     ERC721Interface public nonFungibleRegistry;
 
     struct Auction {
-        // Auction ID
-        bytes32 id;
+        // Assets for sale - array allows Auction to be used for both single and multi-asset orders
+        uint256[] assets;
         // Owner of the NFT
         address seller;
         // Price (in wei) for the published item
@@ -45,23 +45,32 @@ contract Marketplace is Ownable {
 
     /* EVENTS */
     event AuctionCreated(
-        bytes32 id,
         uint256 indexed assetId,
-        address indexed seller, 
-        uint256 priceInWei, 
-        uint256 expiresAt
+        address indexed seller,
+        uint256 priceInWei,
+        uint256 expiresAt,
+        bool indexed estate
     );
     event AuctionSuccessful(
-        bytes32 id,
-        uint256 indexed assetId, 
-        address indexed seller, 
-        uint256 totalPrice, 
-        address indexed winner
+        uint256 indexed assetId,
+        address indexed seller,
+        uint256 totalPrice,
+        address indexed winner,
+        bool indexed estate
     );
     event AuctionCancelled(
-        bytes32 id,
-        uint256 indexed assetId, 
-        address indexed seller
+        uint256 indexed assetId,
+        address indexed seller,
+        bool indexed estate
+    );
+    event EstateAuctionCreated(
+        uint256[] assets
+    );
+    event EstateAuctionSuccessful(
+        uint256[] assets
+    );
+    event EstateAuctionCancelled(
+        uint256[] assets
     );
 
     event ChangedPublicationFee(uint256 publicationFee);
@@ -102,31 +111,28 @@ contract Marketplace is Ownable {
     }
 
     /**
-     * @dev Cancel an already published order
+     * @dev Create a new order
      * @param assetId - ID of the published NFT
      * @param priceInWei - Price in Wei for the supported coin.
      * @param expiresAt - Duration of the auction (in hours)
      */
     function createOrder(uint256 assetId, uint256 priceInWei, uint256 expiresAt) public {
+        require(!auctionList[assetId]);
         require(nonFungibleRegistry.isAuthorized(msg.sender, assetId));
         require(nonFungibleRegistry.isAuthorized(address(this), assetId));
         require(priceInWei > 0);
         require(expiresAt > now.add(1 minutes));
 
-        bytes32 auctionId = keccak256(
-            block.timestamp, 
-            nonFungibleRegistry.ownerOf(assetId), 
-            assetId, 
-            priceInWei
-        );
+        uint256[1] memory asset = [assetId];
 
         auctionList[assetId] = Auction({
-            id: auctionId,
             seller: nonFungibleRegistry.ownerOf(assetId),
             price: priceInWei,
             startedAt: now,
             expiresAt: expiresAt
         });
+        auctionList[assetId].assets.length = 1;
+        auctionList[assetId].assets = asset;
 
         // Check if there's a publication fee and
         // transfer the amount to marketplace owner.
@@ -139,12 +145,65 @@ contract Marketplace is Ownable {
         }
 
         AuctionCreated(
-            auctionList[assetId].id, 
-            assetId, 
-            auctionList[assetId].seller, 
-            priceInWei, 
-            expiresAt
+            assetId,
+            auctionList[assetId].seller,
+            priceInWei,
+            expiresAt,
+            0
         );
+    }
+
+    /**
+     * @dev Create a new ESTATE order
+     * @param assets[] - Assets for sale
+     * @param priceInWei - Price in Wei for the supported coin.
+     * @param expiresAt - Duration of the auction (in hours)
+     */
+    function createEstate(uint256[] assets, uint256 priceInWei, uint256 expiresAt) public {
+        // Store locally calls needed in for loops
+        uint256 memory length = assets.length;
+        address memory myAddr = address(this);
+
+        for (i = 0; i < length; i++) {
+            require(!auctionList[assets[i]]);
+            require(nonFungibleRegistry.isAuthorized(msg.sender, assets[i]));
+            require(nonFungibleRegistry.isAuthorized(myAddr, assets[i]));
+        }
+        require(priceInWei > 0);
+        require(expiresAt > now.add(1 minutes));
+
+        // Check if there's a publication fee and
+        // transfer the amount to marketplace owner.
+        if (publicationFeeInWei > 0) {
+            acceptedToken.transferFrom(
+                msg.sender,
+                owner,
+                publicationFeeInWei
+            );
+        }
+
+        // Same seller for all assets - call not needed in loop
+        address memory _seller = nonFungibleRegistry.ownerOf(assets[0]);
+        Auction memory auction = Auction({
+            seller: _seller,
+            price: priceInWei,
+            startedAt: now,
+            expiresAt: expiresAt
+        });
+        auction.assets.length = length;
+        auction.assets = assets;
+
+
+        for (i = 0; i < length; i++) {
+            auctionList[assets[i]] = auction;
+            AuctionCreated(
+                assets[i],
+                _seller,
+                priceInWei,
+                expiresAt,
+                1
+            );
+            EstateAuctionCreated(assets);
     }
 
     /**
@@ -155,11 +214,28 @@ contract Marketplace is Ownable {
     function cancelOrder(uint256 assetId) public {
         require(auctionList[assetId].seller == msg.sender || msg.sender == owner);
 
-        bytes32 auctionId = auctionList[assetId].id;
         address auctionSeller = auctionList[assetId].seller;
         delete auctionList[assetId];
 
-        AuctionCancelled(auctionId, assetId, auctionSeller);
+        AuctionCancelled(assetId, auctionSeller, 0);
+    }
+
+    /**
+     * @dev Cancel an already published ESTATE order
+     *  can only be canceled by seller or the contract owner.
+     * @param assets[] - Array of the published NFT
+     */
+    function cancelEstate(uint256[] assets) public {
+        require(auctionList[assets[0]].seller == msg.sender || msg.sender == owner);
+
+        uint256 memory length = assets.length;
+        address auctionSeller = auctionList[assets[0]].seller;
+
+        for (i = 0; i < length; i++) {
+            delete auctionList[assets[i]];
+            AuctionCancelled(assets[i], auctionSeller, 1);
+        }
+        EstateAuctionCancelled(assets);
     }
 
     /**
@@ -167,21 +243,23 @@ contract Marketplace is Ownable {
      * @param assetId - ID of the published NFT
      */
     function executeOrder(uint256 assetId, uint256 price) public {
-        require(auctionList[assetId].seller != address(0));
-        require(auctionList[assetId].seller != msg.sender);
+        address memory _seller = auctionList[assetId].seller;
+        require(_seller != address(0));
+        require(_seller != msg.sender);
         require(auctionList[assetId].price == price);
         require(now < auctionList[assetId].expiresAt);
 
         address nonFungibleHolder = nonFungibleRegistry.ownerOf(assetId);
 
-        require(auctionList[assetId].seller == nonFungibleHolder);
+        require(_seller == nonFungibleHolder);
 
+        uint256 memory _price = auctionList[assetId].price;
         uint saleShareAmount = 0;
 
         if (ownerCutPercentage > 0) {
 
             // Calculate sale share
-            saleShareAmount = auctionList[assetId].price.mul(ownerCutPercentage).div(100);
+            saleShareAmount = _price.mul(ownerCutPercentage).div(100);
 
             // Transfer share amount for marketplace Owner.
             acceptedToken.transferFrom(
@@ -195,22 +273,83 @@ contract Marketplace is Ownable {
         acceptedToken.transferFrom(
             msg.sender,
             nonFungibleHolder,
-            auctionList[assetId].price.sub(saleShareAmount)
+            _price.price.sub(saleShareAmount)
         );
 
         // Transfer asset owner
         nonFungibleRegistry.safeTransferFrom(
-            auctionList[assetId].seller,
+            _seller.seller,
             msg.sender,
             assetId
         );
 
-
-        bytes32 auctionId = auctionList[assetId].id;
-        address auctionSeller = auctionList[assetId].seller;
-        uint256 auctionPrice = auctionList[assetId].price;
         delete auctionList[assetId];
 
-        AuctionSuccessful(auctionId, assetId, auctionSeller, auctionPrice, msg.sender);
+        AuctionSuccessful(assetId, _seller, _price, msg.sender, 0);
+    }
+
+    /**
+     * @dev Executes the sale for a published ESTATE NTF
+     * @param assets[] - Array of the published NFT
+     */
+    function executeEstate(uint256[] assets, uint256 price) public {
+        address memory _seller = auctionList[assets[0]].seller;
+        require(_seller != address(0));
+        require(_seller != msg.sender);
+        require(auctionList[assets[0]].price == price);
+        require(now < auctionList[assets[0]].expiresAt);
+
+        address nonFungibleHolder = nonFungibleRegistry.ownerOf(assets[0]);
+
+        require(auctionList[assetId].seller == nonFungibleHolder);
+
+        uint256 memory _price = auctionList[assets[0]].price;
+        uint saleShareAmount = 0;
+
+        if (ownerCutPercentage > 0) {
+
+            // Calculate sale share
+            saleShareAmount = _price.mul(ownerCutPercentage).div(100);
+
+            // Transfer share amount for marketplace Owner.
+            acceptedToken.transferFrom(
+                msg.sender,
+                owner,
+                saleShareAmount
+            );
+        }
+
+        // Transfer sale amount to seller
+        acceptedToken.transferFrom(
+            msg.sender,
+            nonFungibleHolder,
+            _price.sub(saleShareAmount)
+        );
+
+        // Transfer asset owner
+        uint256 memory length = assets.length;
+
+        for (i = 0; i < length; i++) {
+            nonFungibleRegistry.safeTransferFrom(
+                _seller,
+                msg.sender,
+                assets[i]
+            );
+
+            delete auctionList[assets[i]];
+            AuctionSuccessful(assets[i], _seller, _price, msg.sender, 1);
+         }
+         EstateAuctionSuccessful(assets);
     }
  }
+
+/**
+ * If you still need auctionId for a reason I am unaware of, I would
+ * add a mapping(bytes32 => Auction) auctionIds
+ *
+ * after auction item is created after 133 and after 190:
+ * bytes32 auctionId = keccak256(
+ *         block.timestamp,
+ *         Auction object
+ * );
+ */
