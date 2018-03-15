@@ -46,20 +46,20 @@ contract Marketplace is Ownable {
     /* EVENTS */
     event AuctionCreated(
         uint256 indexed assetId,
-        address indexed seller, 
-        uint256 priceInWei, 
+        address indexed seller,
+        uint256 priceInWei,
         uint256 expiresAt,
         bool indexed estate
     );
     event AuctionSuccessful(
-        uint256 indexed assetId, 
-        address indexed seller, 
-        uint256 totalPrice, 
+        uint256 indexed assetId,
+        address indexed seller,
+        uint256 totalPrice,
         address indexed winner,
         bool indexed estate
     );
     event AuctionCancelled(
-        uint256 indexed assetId, 
+        uint256 indexed assetId,
         address indexed seller,
         bool indexed estate
     );
@@ -67,10 +67,10 @@ contract Marketplace is Ownable {
         uint256[] assets
     );
     event EstateAuctionSuccessful(
-        uint256[] assets 
+        uint256[] assets
     );
     event EstateAuctionCancelled(
-        uint256[] assets 
+        uint256[] assets
     );
 
     event ChangedPublicationFee(uint256 publicationFee);
@@ -122,16 +122,17 @@ contract Marketplace is Ownable {
         require(nonFungibleRegistry.isAuthorized(address(this), assetId));
         require(priceInWei > 0);
         require(expiresAt > now.add(1 minutes));
-        
+
         uint256[1] memory asset = [assetId];
-        
+
         auctionList[assetId] = Auction({
-            assets: asset,
             seller: nonFungibleRegistry.ownerOf(assetId),
             price: priceInWei,
             startedAt: now,
             expiresAt: expiresAt
         });
+        auctionList[assetId].assets.length = 1;
+        auctionList[assetId].assets = asset;
 
         // Check if there's a publication fee and
         // transfer the amount to marketplace owner.
@@ -143,10 +144,10 @@ contract Marketplace is Ownable {
             );
         }
 
-        AuctionCreated( 
-            assetId, 
-            auctionList[assetId].seller, 
-            priceInWei, 
+        AuctionCreated(
+            assetId,
+            auctionList[assetId].seller,
+            priceInWei,
             expiresAt,
             0
         );
@@ -162,7 +163,7 @@ contract Marketplace is Ownable {
         // Store locally calls needed in for loops
         uint256 memory length = assets.length;
         address memory myAddr = address(this);
-        
+
         for (i = 0; i < length; i++) {
             require(!auctionList[assets[i]]);
             require(nonFungibleRegistry.isAuthorized(msg.sender, assets[i]));
@@ -170,7 +171,7 @@ contract Marketplace is Ownable {
         }
         require(priceInWei > 0);
         require(expiresAt > now.add(1 minutes));
-        
+
         // Check if there's a publication fee and
         // transfer the amount to marketplace owner.
         if (publicationFeeInWei > 0) {
@@ -184,19 +185,21 @@ contract Marketplace is Ownable {
         // Same seller for all assets - call not needed in loop
         address memory _seller = nonFungibleRegistry.ownerOf(assets[0]);
         Auction memory auction = Auction({
-            assets: assets,
             seller: _seller,
             price: priceInWei,
             startedAt: now,
             expiresAt: expiresAt
         });
-        
+        auction.assets.length = length;
+        auction.assets = assets;
+
+
         for (i = 0; i < length; i++) {
-            auctionList[assets[i]] = auction; 
-            AuctionCreated( 
-                assets[i], 
-                _seller, 
-                priceInWei, 
+            auctionList[assets[i]] = auction;
+            AuctionCreated(
+                assets[i],
+                _seller,
+                priceInWei,
                 expiresAt,
                 1
             );
@@ -224,10 +227,10 @@ contract Marketplace is Ownable {
      */
     function cancelEstate(uint256[] assets) public {
         require(auctionList[assets[0]].seller == msg.sender || msg.sender == owner);
-        
+
         uint256 memory length = assets.length;
         address auctionSeller = auctionList[assets[0]].seller;
-        
+
         for (i = 0; i < length; i++) {
             delete auctionList[assets[i]];
             AuctionCancelled(assets[i], auctionSeller, 1);
@@ -241,15 +244,15 @@ contract Marketplace is Ownable {
      */
     function executeOrder(uint256 assetId, uint256 price) public {
         address memory _seller = auctionList[assetId].seller;
-        require(_seller != address(0));  
-        require(_seller != msg.sender);  
+        require(_seller != address(0));
+        require(_seller != msg.sender);
         require(auctionList[assetId].price == price);
         require(now < auctionList[assetId].expiresAt);
 
         address nonFungibleHolder = nonFungibleRegistry.ownerOf(assetId);
 
         require(_seller == nonFungibleHolder);
-        
+
         uint256 memory _price = auctionList[assetId].price;
         uint saleShareAmount = 0;
 
@@ -284,15 +287,15 @@ contract Marketplace is Ownable {
 
         AuctionSuccessful(assetId, _seller, _price, msg.sender, 0);
     }
-    
+
     /**
      * @dev Executes the sale for a published ESTATE NTF
      * @param assets[] - Array of the published NFT
      */
     function executeEstate(uint256[] assets, uint256 price) public {
         address memory _seller = auctionList[assets[0]].seller;
-        require(_seller != address(0));  
-        require(_seller != msg.sender); 
+        require(_seller != address(0));
+        require(_seller != msg.sender);
         require(auctionList[assets[0]].price == price);
         require(now < auctionList[assets[0]].expiresAt);
 
@@ -315,7 +318,7 @@ contract Marketplace is Ownable {
                 saleShareAmount
             );
         }
-        
+
         // Transfer sale amount to seller
         acceptedToken.transferFrom(
             msg.sender,
@@ -325,7 +328,7 @@ contract Marketplace is Ownable {
 
         // Transfer asset owner
         uint256 memory length = assets.length;
-        
+
         for (i = 0; i < length; i++) {
             nonFungibleRegistry.safeTransferFrom(
                 _seller,
@@ -346,7 +349,7 @@ contract Marketplace is Ownable {
  *
  * after auction item is created after 133 and after 190:
  * bytes32 auctionId = keccak256(
- *         block.timestamp, 
+ *         block.timestamp,
  *         Auction object
  * );
  */
