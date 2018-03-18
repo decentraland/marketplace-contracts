@@ -57,6 +57,9 @@ contract('Marketplace', function([_, owner, seller, buyer]) {
     await erc721.setAssetHolder(seller, assetId)
     await erc721.setApprovalForAll(market.address, true, { from: seller })
     await erc721.setApprovalForAll(market.address, true, { from: buyer })
+
+    // Assign balance to buyer and allow marketplace to move ERC20
+    await erc20.setBalance(buyer, web3.toWei(10, 'ether'))
     await erc20.approve(market.address, 1e30, { from: seller })
     await erc20.approve(market.address, 1e30, { from: buyer })
   })
@@ -75,7 +78,7 @@ contract('Marketplace', function([_, owner, seller, buyer]) {
     checkAuctionCreatedLog(logs[0], assetId, seller, itemPrice, endTime)
 
     // Check data
-    let s = await market.auctionList(assetId)
+    let s = await market.auctionByAssetId(assetId)
     s[1].should.be.equal(seller)
     s[2].should.be.bignumber.equal(itemPrice)
     s[3].should.be.bignumber.equal(endTime)
@@ -94,7 +97,7 @@ contract('Marketplace', function([_, owner, seller, buyer]) {
     checkAuctionCreatedLog(logs[0], assetId, seller, newPrice, newEndTime)
 
     // Check data
-    let s = await market.auctionList(assetId)
+    let s = await market.auctionByAssetId(assetId)
     s[1].should.be.equal(seller)
     s[2].should.be.bignumber.equal(newPrice)
     s[3].should.be.bignumber.equal(newEndTime)
