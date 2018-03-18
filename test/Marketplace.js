@@ -54,8 +54,11 @@ contract('Marketplace', function([_, owner, seller, buyer]) {
     })
 
     // Set holder of the asset and aproved on registry
-    await erc721.setAssetHolder(seller)
-    await erc721.setApprovalForAll(market.address, true)
+    await erc721.setAssetHolder(seller, assetId)
+    await erc721.setApprovalForAll(market.address, true, { from: seller })
+    await erc721.setApprovalForAll(market.address, true, { from: buyer })
+    await erc20.approve(market.address, 1e30, { from: seller })
+    await erc20.approve(market.address, 1e30, { from: buyer })
   })
 
   // Create
@@ -75,7 +78,7 @@ contract('Marketplace', function([_, owner, seller, buyer]) {
     let s = await market.auctionList(assetId)
     s[1].should.be.equal(seller)
     s[2].should.be.bignumber.equal(itemPrice)
-    s[4].should.be.bignumber.equal(endTime)
+    s[3].should.be.bignumber.equal(endTime)
   })
 
   it('should update an order', async function() {
@@ -94,7 +97,7 @@ contract('Marketplace', function([_, owner, seller, buyer]) {
     let s = await market.auctionList(assetId)
     s[1].should.be.equal(seller)
     s[2].should.be.bignumber.equal(newPrice)
-    s[4].should.be.bignumber.equal(newEndTime)
+    s[3].should.be.bignumber.equal(newEndTime)
   })
 
   // Cancel
