@@ -32,8 +32,6 @@ contract Marketplace is Ownable {
         address seller;
         // Price (in wei) for the published item
         uint256 price;
-        // Time when this sale started, 0 if closed
-        uint256 startedAt;
         // Time when this sale ends
         uint256 expiresAt;
     }
@@ -124,7 +122,6 @@ contract Marketplace is Ownable {
             id: auctionId,
             seller: nonFungibleRegistry.ownerOf(assetId),
             price: priceInWei,
-            startedAt: now,
             expiresAt: expiresAt
         });
 

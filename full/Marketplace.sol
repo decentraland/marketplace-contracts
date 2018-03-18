@@ -115,12 +115,12 @@ contract Marketplace is Ownable {
     ERC721Interface public nonFungibleRegistry;
 
     struct Auction {
+        // Auction ID
+        bytes32 id;
         // Owner of the NFT
         address seller;
         // Price (in wei) for the published item
         uint256 price;
-        // Time when this sale started, 0 if closed
-        uint256 startedAt;
         // Time when this sale ends
         uint256 expiresAt;
     }
@@ -131,9 +131,25 @@ contract Marketplace is Ownable {
     uint256 public publicationFeeInWei;
 
     /* EVENTS */
-    event AuctionCreated(uint256 indexed assetId, address indexed owner, uint256 priceInWei, uint256 expiresAt);
-    event AuctionSuccessful(uint256 indexed assetId, uint256 totalPrice, address indexed winner);
-    event AuctionCancelled(uint256 indexed assetId);
+    event AuctionCreated(
+        bytes32 id,
+        uint256 indexed assetId,
+        address indexed seller, 
+        uint256 priceInWei, 
+        uint256 expiresAt
+    );
+    event AuctionSuccessful(
+        bytes32 id,
+        uint256 indexed assetId, 
+        address indexed seller, 
+        uint256 totalPrice, 
+        address indexed winner
+    );
+    event AuctionCancelled(
+        bytes32 id,
+        uint256 indexed assetId, 
+        address indexed seller
+    );
 
     event ChangedPublicationFee(uint256 publicationFee);
     event ChangedOwnerCut(uint256 ownerCut);
@@ -184,10 +200,17 @@ contract Marketplace is Ownable {
         require(priceInWei > 0);
         require(expiresAt > now.add(1 minutes));
 
+        bytes32 auctionId = keccak256(
+            block.timestamp, 
+            nonFungibleRegistry.ownerOf(assetId), 
+            assetId, 
+            priceInWei
+        );
+
         auctionList[assetId] = Auction({
+            id: auctionId,
             seller: nonFungibleRegistry.ownerOf(assetId),
             price: priceInWei,
-            startedAt: now,
             expiresAt: expiresAt
         });
 
@@ -201,7 +224,13 @@ contract Marketplace is Ownable {
             );
         }
 
-        AuctionCreated(assetId, msg.sender, priceInWei, expiresAt);
+        AuctionCreated(
+            auctionList[assetId].id, 
+            assetId, 
+            auctionList[assetId].seller, 
+            priceInWei, 
+            expiresAt
+        );
     }
 
     /**
@@ -212,9 +241,11 @@ contract Marketplace is Ownable {
     function cancelOrder(uint256 assetId) public {
         require(auctionList[assetId].seller == msg.sender || msg.sender == owner);
 
+        bytes32 auctionId = auctionList[assetId].id;
+        address auctionSeller = auctionList[assetId].seller;
         delete auctionList[assetId];
 
-        AuctionCancelled(assetId);
+        AuctionCancelled(auctionId, assetId, auctionSeller);
     }
 
     /**
@@ -260,8 +291,12 @@ contract Marketplace is Ownable {
             assetId
         );
 
+
+        bytes32 auctionId = auctionList[assetId].id;
+        address auctionSeller = auctionList[assetId].seller;
+        uint256 auctionPrice = auctionList[assetId].price;
         delete auctionList[assetId];
 
-        AuctionSuccessful(assetId, auctionList[assetId].price, msg.sender);
+        AuctionSuccessful(auctionId, assetId, auctionSeller, auctionPrice, msg.sender);
     }
  }
