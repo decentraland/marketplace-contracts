@@ -106,7 +106,8 @@ contract Marketplace is Ownable {
      * @param expiresAt - Duration of the auction (in hours)
      */
     function createOrder(uint256 assetId, uint256 priceInWei, uint256 expiresAt) public {
-        require(nonFungibleRegistry.isAuthorized(msg.sender, assetId));
+        address owner = nonFungibleRegistry.ownerOf(assetId);
+        require(msg.sender == owner);
         require(nonFungibleRegistry.isAuthorized(address(this), assetId));
         require(priceInWei > 0);
         require(expiresAt > now.add(1 minutes));
@@ -120,7 +121,7 @@ contract Marketplace is Ownable {
 
         auctionList[assetId] = Auction({
             id: auctionId,
-            seller: nonFungibleRegistry.ownerOf(assetId),
+            seller: owner,
             price: priceInWei,
             expiresAt: expiresAt
         });
@@ -136,9 +137,9 @@ contract Marketplace is Ownable {
         }
 
         AuctionCreated(
-            auctionList[assetId].id, 
+            auctionId,
             assetId, 
-            auctionList[assetId].seller, 
+            owner,
             priceInWei, 
             expiresAt
         );
