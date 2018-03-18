@@ -125,7 +125,7 @@ contract Marketplace is Ownable {
         uint256 expiresAt;
     }
 
-    mapping (uint256 => Auction) public auctionList;
+    mapping (uint256 => Auction) public auctionByAssetId;
 
     uint256 public ownerCutPercentage;
     uint256 public publicationFeeInWei;
@@ -195,21 +195,22 @@ contract Marketplace is Ownable {
      * @param expiresAt - Duration of the auction (in hours)
      */
     function createOrder(uint256 assetId, uint256 priceInWei, uint256 expiresAt) public {
-        require(nonFungibleRegistry.isAuthorized(msg.sender, assetId));
+        address owner = nonFungibleRegistry.ownerOf(assetId);
+        require(msg.sender == owner);
         require(nonFungibleRegistry.isAuthorized(address(this), assetId));
         require(priceInWei > 0);
         require(expiresAt > now.add(1 minutes));
 
         bytes32 auctionId = keccak256(
             block.timestamp, 
-            nonFungibleRegistry.ownerOf(assetId), 
+            owner,
             assetId, 
             priceInWei
         );
 
-        auctionList[assetId] = Auction({
+        auctionByAssetId[assetId] = Auction({
             id: auctionId,
-            seller: nonFungibleRegistry.ownerOf(assetId),
+            seller: owner,
             price: priceInWei,
             expiresAt: expiresAt
         });
@@ -225,9 +226,9 @@ contract Marketplace is Ownable {
         }
 
         AuctionCreated(
-            auctionList[assetId].id, 
+            auctionId,
             assetId, 
-            auctionList[assetId].seller, 
+            owner,
             priceInWei, 
             expiresAt
         );
@@ -239,11 +240,11 @@ contract Marketplace is Ownable {
      * @param assetId - ID of the published NFT
      */
     function cancelOrder(uint256 assetId) public {
-        require(auctionList[assetId].seller == msg.sender || msg.sender == owner);
+        require(auctionByAssetId[assetId].seller == msg.sender || msg.sender == owner);
 
-        bytes32 auctionId = auctionList[assetId].id;
-        address auctionSeller = auctionList[assetId].seller;
-        delete auctionList[assetId];
+        bytes32 auctionId = auctionByAssetId[assetId].id;
+        address auctionSeller = auctionByAssetId[assetId].seller;
+        delete auctionByAssetId[assetId];
 
         AuctionCancelled(auctionId, assetId, auctionSeller);
     }
@@ -253,21 +254,22 @@ contract Marketplace is Ownable {
      * @param assetId - ID of the published NFT
      */
     function executeOrder(uint256 assetId, uint256 price) public {
-        require(auctionList[assetId].seller != address(0));
-        require(auctionList[assetId].seller != msg.sender);
-        require(auctionList[assetId].price == price);
-        require(now < auctionList[assetId].expiresAt);
+        Auction auction = auctionByAssetId[assetId];
+        require(auction.seller != address(0));
+        require(auction.seller != msg.sender);
+        require(auction.price == price);
+        require(now < auction.expiresAt);
 
         address nonFungibleHolder = nonFungibleRegistry.ownerOf(assetId);
 
-        require(auctionList[assetId].seller == nonFungibleHolder);
+        require(auctionByAssetId[assetId].seller == nonFungibleHolder);
 
         uint saleShareAmount = 0;
 
         if (ownerCutPercentage > 0) {
 
             // Calculate sale share
-            saleShareAmount = auctionList[assetId].price.mul(ownerCutPercentage).div(100);
+            saleShareAmount = price.mul(ownerCutPercentage).div(100);
 
             // Transfer share amount for marketplace Owner.
             acceptedToken.transferFrom(
@@ -281,22 +283,20 @@ contract Marketplace is Ownable {
         acceptedToken.transferFrom(
             msg.sender,
             nonFungibleHolder,
-            auctionList[assetId].price.sub(saleShareAmount)
+            price.sub(saleShareAmount)
         );
 
         // Transfer asset owner
         nonFungibleRegistry.safeTransferFrom(
-            auctionList[assetId].seller,
+            nonFungibleHolder,
             msg.sender,
             assetId
         );
 
 
-        bytes32 auctionId = auctionList[assetId].id;
-        address auctionSeller = auctionList[assetId].seller;
-        uint256 auctionPrice = auctionList[assetId].price;
-        delete auctionList[assetId];
+        bytes32 auctionId = auctionByAssetId[assetId].id;
+        delete auctionByAssetId[assetId];
 
-        AuctionSuccessful(auctionId, assetId, auctionSeller, auctionPrice, msg.sender);
+        AuctionSuccessful(auctionId, assetId, nonFungibleHolder, price, msg.sender);
     }
  }
