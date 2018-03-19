@@ -2,6 +2,7 @@ pragma solidity 0.4.19;
 
 import "zeppelin-solidity/contracts/ownership/Ownable.sol";
 import "zeppelin-solidity/contracts/lifecycle/Pausable.sol";
+import "zeppelin-solidity/contracts/lifecycle/Destructible.sol";
 import "zeppelin-solidity/contracts/math/SafeMath.sol";
 
 /**
@@ -20,7 +21,7 @@ contract ERC721Interface {
     function isAuthorized(address operator, uint256 assetId) public view returns (bool);
 }
 
-contract Marketplace is Ownable, Pausable {
+contract Marketplace is Ownable, Pausable, Destructible {
     using SafeMath for uint256;
 
     ERC20Interface public acceptedToken;

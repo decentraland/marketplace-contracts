@@ -42,6 +42,28 @@ contract Ownable {
 
 }
 
+// File: zeppelin-solidity/contracts/lifecycle/Destructible.sol
+
+/**
+ * @title Destructible
+ * @dev Base contract that can be destroyed by owner. All funds in contract will be sent to the owner.
+ */
+contract Destructible is Ownable {
+
+  function Destructible() public payable { }
+
+  /**
+   * @dev Transfers the current balance to the owner and terminates the contract.
+   */
+  function destroy() onlyOwner public {
+    selfdestruct(owner);
+  }
+
+  function destroyAndSend(address _recipient) onlyOwner public {
+    selfdestruct(_recipient);
+  }
+}
+
 // File: zeppelin-solidity/contracts/lifecycle/Pausable.sol
 
 /**
@@ -154,7 +176,7 @@ contract ERC721Interface {
     function isAuthorized(address operator, uint256 assetId) public view returns (bool);
 }
 
-contract Marketplace is Ownable, Pausable {
+contract Marketplace is Ownable, Pausable, Destructible {
     using SafeMath for uint256;
 
     ERC20Interface public acceptedToken;
