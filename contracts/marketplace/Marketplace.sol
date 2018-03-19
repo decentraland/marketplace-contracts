@@ -1,6 +1,7 @@
 pragma solidity 0.4.19;
 
 import "zeppelin-solidity/contracts/ownership/Ownable.sol";
+import "zeppelin-solidity/contracts/lifecycle/Pausable.sol";
 import "zeppelin-solidity/contracts/math/SafeMath.sol";
 
 /**
@@ -19,7 +20,7 @@ contract ERC721Interface {
     function isAuthorized(address operator, uint256 assetId) public view returns (bool);
 }
 
-contract Marketplace is Ownable {
+contract Marketplace is Ownable, Pausable {
     using SafeMath for uint256;
 
     ERC20Interface public acceptedToken;
@@ -105,7 +106,7 @@ contract Marketplace is Ownable {
      * @param priceInWei - Price in Wei for the supported coin.
      * @param expiresAt - Duration of the auction (in hours)
      */
-    function createOrder(uint256 assetId, uint256 priceInWei, uint256 expiresAt) public {
+    function createOrder(uint256 assetId, uint256 priceInWei, uint256 expiresAt) public whenNotPaused {
         address assetOwner = nonFungibleRegistry.ownerOf(assetId);
         require(msg.sender == assetOwner);
         require(nonFungibleRegistry.isAuthorized(address(this), assetId));
@@ -150,7 +151,7 @@ contract Marketplace is Ownable {
      *  can only be canceled by seller or the contract owner.
      * @param assetId - ID of the published NFT
      */
-    function cancelOrder(uint256 assetId) public {
+    function cancelOrder(uint256 assetId) public whenNotPaused {
         require(auctionByAssetId[assetId].seller == msg.sender || msg.sender == owner);
 
         bytes32 auctionId = auctionByAssetId[assetId].id;
@@ -164,7 +165,7 @@ contract Marketplace is Ownable {
      * @dev Executes the sale for a published NTF
      * @param assetId - ID of the published NFT
      */
-    function executeOrder(uint256 assetId, uint256 price) public {
+    function executeOrder(uint256 assetId, uint256 price) public whenNotPaused {
         address seller = auctionByAssetId[assetId].seller;
 
         require(seller != address(0));
