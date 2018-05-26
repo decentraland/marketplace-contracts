@@ -1,9 +1,9 @@
-pragma solidity 0.4.19;
+pragma solidity 0.4.23;
 
-import "zeppelin-solidity/contracts/ownership/Ownable.sol";
-import "zeppelin-solidity/contracts/lifecycle/Pausable.sol";
-import "zeppelin-solidity/contracts/lifecycle/Destructible.sol";
-import "zeppelin-solidity/contracts/math/SafeMath.sol";
+import "openzeppelin-solidity/contracts/ownership/Ownable.sol";
+import "openzeppelin-solidity/contracts/lifecycle/Pausable.sol";
+import "openzeppelin-solidity/contracts/lifecycle/Destructible.sol";
+import "openzeppelin-solidity/contracts/math/SafeMath.sol";
 
 /**
  * @title Interface for contracts conforming to ERC-20
@@ -67,13 +67,12 @@ contract Marketplace is Ownable, Pausable, Destructible {
     event ChangedPublicationFee(uint256 publicationFee);
     event ChangedOwnerCut(uint256 ownerCut);
 
-
     /**
      * @dev Constructor for this contract.
      * @param _acceptedToken - Address of the ERC20 accepted for this marketplace
      * @param _nonFungibleRegistry - Address of the ERC721 registry contract.
      */
-    function Marketplace(address _acceptedToken, address _nonFungibleRegistry) public {
+    constructor(address _acceptedToken, address _nonFungibleRegistry) public {
         acceptedToken = ERC20Interface(_acceptedToken);
         nonFungibleRegistry = ERC721Interface(_nonFungibleRegistry);
     }
@@ -85,7 +84,7 @@ contract Marketplace is Ownable, Pausable, Destructible {
     function setPublicationFee(uint256 publicationFee) onlyOwner public {
         publicationFeeInWei = publicationFee;
 
-        ChangedPublicationFee(publicationFeeInWei);
+        emit ChangedPublicationFee(publicationFeeInWei);
     }
 
     /**
@@ -98,7 +97,7 @@ contract Marketplace is Ownable, Pausable, Destructible {
 
         ownerCutPercentage = ownerCut;
 
-        ChangedOwnerCut(ownerCutPercentage);
+        emit ChangedOwnerCut(ownerCutPercentage);
     }
 
     /**
@@ -138,7 +137,7 @@ contract Marketplace is Ownable, Pausable, Destructible {
             ));
         }
 
-        AuctionCreated(
+        emit AuctionCreated(
             auctionId,
             assetId, 
             assetOwner,
@@ -159,7 +158,7 @@ contract Marketplace is Ownable, Pausable, Destructible {
         address auctionSeller = auctionByAssetId[assetId].seller;
         delete auctionByAssetId[assetId];
 
-        AuctionCancelled(auctionId, assetId, auctionSeller);
+        emit AuctionCancelled(auctionId, assetId, auctionSeller);
     }
 
     /**
@@ -209,6 +208,6 @@ contract Marketplace is Ownable, Pausable, Destructible {
         bytes32 auctionId = auctionByAssetId[assetId].id;
         delete auctionByAssetId[assetId];
 
-        AuctionSuccessful(auctionId, assetId, seller, price, msg.sender);
+        emit AuctionSuccessful(auctionId, assetId, seller, price, msg.sender);
     }
  }
