@@ -1,4 +1,4 @@
-pragma solidity 0.4.23;
+pragma solidity ^0.4.23;
 
 import "openzeppelin-solidity/contracts/ownership/Ownable.sol";
 import "openzeppelin-solidity/contracts/lifecycle/Pausable.sol";
@@ -111,7 +111,7 @@ contract Marketplace is Ownable, Pausable, Destructible {
         require(msg.sender == assetOwner);
         require(nonFungibleRegistry.isAuthorized(address(this), assetId));
         require(priceInWei > 0);
-        require(expiresAt > now.add(1 minutes));
+        require(expiresAt > block.timestamp.add(1 minutes));
 
         bytes32 auctionId = keccak256(
             block.timestamp, 
@@ -171,7 +171,7 @@ contract Marketplace is Ownable, Pausable, Destructible {
         require(seller != address(0));
         require(seller != msg.sender);
         require(auctionByAssetId[assetId].price == price);
-        require(now < auctionByAssetId[assetId].expiresAt);
+        require(block.timestamp < auctionByAssetId[assetId].expiresAt);
 
         require(seller == nonFungibleRegistry.ownerOf(assetId));
 
@@ -210,4 +210,4 @@ contract Marketplace is Ownable, Pausable, Destructible {
 
         emit AuctionSuccessful(auctionId, assetId, seller, price, msg.sender);
     }
- }
+}
