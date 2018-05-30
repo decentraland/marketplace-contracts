@@ -17,7 +17,9 @@ jobs:
           # fallback to using the latest cache if no exact match is found
           - v1-dependencies-
 
-      - run: yarn install
+      - run:
+          name: Install packages
+          command: npm install
 
       - save_cache:
           paths:
@@ -25,4 +27,6 @@ jobs:
           key: v1-dependencies-{{ checksum "package-lock.json" }}
         
       # run tests!
-      - run: yarn test
+      - run: 
+          name: Run tests
+          command: npm run test
