@@ -8,8 +8,8 @@ require('chai')
 const EVMThrow = 'invalid opcode'
 const EVMRevert = 'VM Exception while processing transaction: revert'
 
-const ERC20Mock = artifacts.require('FakeERC20')
-const ERC721Mock = artifacts.require('FakeERC721')
+const ERC20Token = artifacts.require('FakeERC20')
+const ERC721Token = artifacts.require("FakeERC721");
 const Marketplace = artifacts.require('Marketplace')
 
 const { increaseTime, duration } = require('./helpers/increaseTime')
@@ -44,9 +44,15 @@ contract('Marketplace', function([_, owner, seller, buyer]) {
   let erc20
   let erc721
 
+  const creationParams = {
+    gas: 6e6,
+    gasPrice: 21e9,
+  }
+
   beforeEach(async function() {
-    erc20 = await ERC20Mock.new({ from: owner })
-    erc721 = await ERC721Mock.new({ from: owner })
+    // Create tokens
+    erc20 = await ERC20Token.new({ from: owner })
+    erc721 = await ERC721Token.new('LAND', 'DCL', { from: owner, ...creationParams })
 
     // Create a Marketplace with mocks
     market = await Marketplace.new(erc20.address, erc721.address, {
@@ -54,7 +60,7 @@ contract('Marketplace', function([_, owner, seller, buyer]) {
     })
 
     // Set holder of the asset and aproved on registry
-    await erc721.setAssetHolder(seller, assetId)
+    await erc721.mint(seller, assetId)
     await erc721.setApprovalForAll(market.address, true, { from: seller })
     await erc721.setApprovalForAll(market.address, true, { from: buyer })
 
@@ -68,7 +74,7 @@ contract('Marketplace', function([_, owner, seller, buyer]) {
 
   it('should create a new order', async function() {
     let itemPrice = web3.toWei(1, 'ether')
-
+  
     const { logs } = await market.createOrder(assetId, itemPrice, endTime, {
       from: seller
     })
