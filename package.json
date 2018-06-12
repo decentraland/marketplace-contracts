@@ -8,8 +8,10 @@
     "chai-as-promised": "^7.1.1",
     "chai-bignumber": "^2.0.2",
     "dotenv": "^6.0.0",
+    "ethereumjs-abi": "^0.6.5",
     "ganache-cli": "^6.1.0",
-    "truffle": "^4.1.11"
+    "truffle": "^4.1.11",
+    "truffle-hdwallet-provider": "0.0.5"
   },
   "scripts": {
     "test": "scripts/test.sh"
