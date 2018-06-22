@@ -4,21 +4,13 @@ import "openzeppelin-solidity/contracts/ownership/Ownable.sol";
 import "openzeppelin-solidity/contracts/lifecycle/Pausable.sol";
 import "openzeppelin-solidity/contracts/lifecycle/Destructible.sol";
 import "openzeppelin-solidity/contracts/math/SafeMath.sol";
+import "openzeppelin-solidity/contracts/token/ERC721/ERC721Token.sol";
 
 /**
  * @title Interface for contracts conforming to ERC-20
  */
 contract ERC20Interface {
   function transferFrom(address from, address to, uint tokens) public returns (bool success);
-}
-
-/**
- * @title Interface for contracts conforming to ERC-721
- */
-contract ERC721Interface {
-  function ownerOf(uint256 assetId) public view returns (address);
-  function safeTransferFrom(address from, address to, uint256 assetId) public;
-  function isAuthorized(address operator, uint256 assetId) public view returns (bool);
 }
 
 contract Marketplace is Ownable, Pausable, Destructible {
@@ -112,11 +104,11 @@ contract Marketplace is Ownable, Pausable, Destructible {
   function createOrder(uint256 assetId, address nftAddress, uint256 priceInWei, uint256 expiresAt) public whenNotPaused {
     require(isContract(nftAddress));
 
-    ERC721Interface nftRegistry = ERC721Interface(nftAddress);
+    ERC721 nftRegistry = ERC721(nftAddress);
     address assetOwner = nftRegistry.ownerOf(assetId);
 
     require(msg.sender == assetOwner);
-    require(nftRegistry.isAuthorized(address(this), assetId));
+    require(nftRegistry.isApprovedForAll(assetOwner, address(this)));
     require(priceInWei > 0);
     require(expiresAt > block.timestamp.add(1 minutes));
 
@@ -180,7 +172,7 @@ contract Marketplace is Ownable, Pausable, Destructible {
     address seller = orderByAssetId[assetId].seller;
     address nftAddress = orderByAssetId[assetId].nftAddress;
 
-    ERC721Interface nftRegistry = ERC721Interface(nftAddress);
+    ERC721 nftRegistry = ERC721(nftAddress);
 
     require(seller != address(0));
     require(seller != msg.sender);

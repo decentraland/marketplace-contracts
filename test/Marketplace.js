@@ -66,7 +66,7 @@ contract('Marketplace', function([_, owner, seller, buyer]) {
     await erc721.mint(seller, assetId)
     await erc721.setApprovalForAll(market.address, true, { from: seller })
     await erc721.setApprovalForAll(market.address, true, { from: buyer })
-
+    
     // Assign balance to buyer and allow marketplace to move ERC20
     await erc20.setBalance(buyer, web3.toWei(10, 'ether'))
     await erc20.approve(market.address, 1e30, { from: seller })
