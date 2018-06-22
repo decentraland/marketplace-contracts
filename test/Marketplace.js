@@ -14,26 +14,29 @@ const Marketplace = artifacts.require('Marketplace')
 
 const { increaseTime, duration } = require('./helpers/increaseTime')
 
-function checkAuctionCreatedLog(log, assetId, seller, priceInWei, expiresAt) {
+function checkAuctionCreatedLog(log, assetId, seller, nftAddress, priceInWei, expiresAt) {
   log.event.should.be.eq('AuctionCreated')
-  log.args.assetId.should.be.bignumber.equal(assetId)
-  log.args.seller.should.be.equal(seller)
-  log.args.priceInWei.should.be.bignumber.equal(priceInWei)
-  log.args.expiresAt.should.be.bignumber.equal(expiresAt)
+  log.args.assetId.should.be.bignumber.equal(assetId, 'assetId')
+  log.args.seller.should.be.equal(seller, 'seller')
+  log.args.nftAddress.should.be.equal(nftAddress, 'nftAddress')
+  log.args.priceInWei.should.be.bignumber.equal(priceInWei, 'priceInWei')
+  log.args.expiresAt.should.be.bignumber.equal(expiresAt, 'expiresAt')
 }
 
-function checkAuctionCancelledLog(log, assetId, seller) {
+function checkAuctionCancelledLog(log, assetId, seller, nftAddress) {
   log.event.should.be.eq('AuctionCancelled')
-  log.args.assetId.should.be.bignumber.equal(assetId)
-  log.args.seller.should.be.equal(seller)
+  log.args.assetId.should.be.bignumber.equal(assetId, 'assetId')
+  log.args.seller.should.be.equal(seller, 'seller')
+  log.args.nftAddress.should.be.equal(nftAddress, 'nftAddress')
 }
 
-function checkAuctionSuccessfulLog(log, assetId, seller, totalPrice, winner) {
+function checkAuctionSuccessfulLog(log, assetId, seller, nftAddress, totalPrice, winner) {
   log.event.should.be.eq('AuctionSuccessful')
-  log.args.assetId.should.be.bignumber.equal(assetId)
-  log.args.seller.should.be.equal(seller)
-  log.args.totalPrice.should.be.bignumber.equal(totalPrice)
-  log.args.winner.should.be.equal(winner)
+  log.args.assetId.should.be.bignumber.equal(assetId, 'assetId')
+  log.args.seller.should.be.equal(seller, 'seller')
+  log.args.nftAddress.should.be.equal(nftAddress, 'nftAddress')
+  log.args.totalPrice.should.be.bignumber.equal(totalPrice, 'totalPrice')
+  log.args.winner.should.be.equal(winner, 'winner')
 }
 
 contract('Marketplace', function([_, owner, seller, buyer]) {
@@ -55,7 +58,7 @@ contract('Marketplace', function([_, owner, seller, buyer]) {
     erc721 = await ERC721Token.new('LAND', 'DCL', { from: owner, ...creationParams })
 
     // Create a Marketplace with mocks
-    market = await Marketplace.new(erc20.address, erc721.address, {
+    market = await Marketplace.new(erc20.address, {
       from: owner
     })
 
@@ -70,199 +73,216 @@ contract('Marketplace', function([_, owner, seller, buyer]) {
     await erc20.approve(market.address, 1e30, { from: buyer })
   })
 
-  // Create
+  describe('Create', function() {
+    it('should create a new order', async function() {
+      let itemPrice = web3.toWei(1, 'ether')
 
-  it('should create a new order', async function() {
-    let itemPrice = web3.toWei(1, 'ether')
+      const { logs } = await market.createOrder(assetId, erc721.address, itemPrice, endTime, {
+        from: seller
+      })
+
+      // Event emitted
+      logs.length.should.be.equal(1)
+      checkAuctionCreatedLog(logs[0], assetId, seller, erc721.address, itemPrice, endTime)
+
+      // Check data
+      let s = await market.auctionByAssetId(assetId)
+      s[1].should.be.equal(seller)
+      s[2].should.be.equal(erc721.address)
+      s[3].should.be.bignumber.equal(itemPrice)
+      s[4].should.be.bignumber.equal(endTime)
+    })
+
+    it('should update an order', async function() {
+      let newPrice = web3.toWei(2.0, 'ether')
+      let newEndTime = endTime + duration.minutes(5)
+
+      const { logs } = await market.createOrder(assetId, erc721.address, newPrice, newEndTime, {
+        from: seller
+      })
+
+      // Event emitted
+      logs.length.should.be.equal(1)
+      checkAuctionCreatedLog(logs[0], assetId, seller, erc721.address, newPrice, newEndTime)
+
+      // Check data
+      let s = await market.auctionByAssetId(assetId)
+      s[1].should.be.equal(seller)
+      s[2].should.be.equal(erc721.address)
+      s[3].should.be.bignumber.equal(newPrice)
+      s[4].should.be.bignumber.equal(newEndTime)
+    })
+
+    it('should fail to create an order :: (not a contract)', async function() {
+      let itemPrice = web3.toWei(1.0, 'ether')
+
+      await market
+        .createOrder(assetId, erc20.address, itemPrice, endTime, {
+          from: seller
+        })
+        .should.be.rejectedWith(EVMRevert)
+    })
+  })
+
+  describe('Cancel', function () {
+    it('should cancel a created order', async function() {
+      let itemPrice = web3.toWei(1.0, 'ether')
+
+      await market.createOrder(assetId, erc721.address, itemPrice, endTime, {
+        from: seller
+      })
+      const { logs } = await market.cancelOrder(assetId, { from: seller })
+
+      // Event emitted
+      logs.length.should.be.equal(1)
+      checkAuctionCancelledLog(logs[0], assetId, seller, erc721.address)
+    })
+
+    it('should fail canceling an order :: (wrong user)', async function() {
+      let itemPrice = web3.toWei(1.0, 'ether')
+
+      await market.createOrder(assetId, erc721.address, itemPrice, endTime, {
+        from: seller
+      })
+      await market
+        .cancelOrder(assetId, { from: buyer })
+        .should.be.rejectedWith(EVMRevert)
+    })
+  })
   
-    const { logs } = await market.createOrder(assetId, itemPrice, endTime, {
-      from: seller
+  describe('Execute', function() {
+    it('should execute a created order', async function() {
+      let itemPrice = web3.toWei(1.0, 'ether')
+
+      await market.createOrder(assetId, erc721.address, itemPrice, endTime, {
+        from: seller
+      })
+      const { logs } = await market.executeOrder(assetId, itemPrice, { from: buyer })
+
+      // Event emitted
+      logs.length.should.be.equal(1)
+      checkAuctionSuccessfulLog(logs[0], assetId, seller, erc721.address, itemPrice, buyer)
     })
 
-    // Event emitted
-    logs.length.should.be.equal(1)
-    checkAuctionCreatedLog(logs[0], assetId, seller, itemPrice, endTime)
+    it('should fail on execute a created order :: (wrong user)', async function() {
+      let itemPrice = web3.toWei(1.0, 'ether')
 
-    // Check data
-    let s = await market.auctionByAssetId(assetId)
-    s[1].should.be.equal(seller)
-    s[2].should.be.bignumber.equal(itemPrice)
-    s[3].should.be.bignumber.equal(endTime)
-  })
-
-  it('should update an order', async function() {
-    let newPrice = web3.toWei(2.0, 'ether')
-    let newEndTime = endTime + duration.minutes(5)
-
-    const { logs } = await market.createOrder(assetId, newPrice, newEndTime, {
-      from: seller
+      await market.createOrder(assetId, erc721.address, itemPrice, endTime, {
+        from: seller
+      })
+      await market
+        .executeOrder(assetId, itemPrice, { from: seller })
+        .should.be.rejectedWith(EVMRevert)
     })
 
-    // Event emitted
-    logs.length.should.be.equal(1)
-    checkAuctionCreatedLog(logs[0], assetId, seller, newPrice, newEndTime)
+    it('should fail execute a created order :: (expired)', async function() {
+      let itemPrice = web3.toWei(1.0, 'ether')
 
-    // Check data
-    let s = await market.auctionByAssetId(assetId)
-    s[1].should.be.equal(seller)
-    s[2].should.be.bignumber.equal(newPrice)
-    s[3].should.be.bignumber.equal(newEndTime)
-  })
+      await market.createOrder(assetId, erc721.address, itemPrice, endTime, {
+        from: seller
+      })
 
-  // Cancel
-
-  it('should cancel a created order', async function() {
-    let itemPrice = web3.toWei(1.0, 'ether')
-
-    await market.createOrder(assetId, itemPrice, endTime, {
-      from: seller
+      // move 10 mins ahead.
+      await increaseTime(600)
+      await market
+        .executeOrder(assetId, itemPrice, { from: buyer })
+        .should.be.rejectedWith(EVMRevert)
     })
-    const { logs } = await market.cancelOrder(assetId, { from: seller })
-
-    // Event emitted
-    logs.length.should.be.equal(1)
-    checkAuctionCancelledLog(logs[0], assetId, seller)
   })
 
-  it('should fail canceling an order', async function() {
-    let itemPrice = web3.toWei(1.0, 'ether')
+  describe('setPublicationFee', function() {
+    it('should change publication Fee', async function() {
+      let publicationFee = web3.toWei(0.005, 'ether')
 
-    await market.createOrder(assetId, itemPrice, endTime, {
-      from: seller
-    })
-    await market
-      .cancelOrder(assetId, { from: buyer })
-      .should.be.rejectedWith(EVMRevert)
-  })
-
-  // Execute
-
-  it('should execute a created order', async function() {
-    let itemPrice = web3.toWei(1.0, 'ether')
-
-    await market.createOrder(assetId, itemPrice, endTime, {
-      from: seller
-    })
-    const { logs } = await market.executeOrder(assetId, itemPrice, { from: buyer })
-
-    // Event emitted
-    logs.length.should.be.equal(1)
-    checkAuctionSuccessfulLog(logs[0], assetId, seller, itemPrice, buyer)
-  })
-
-  it('should fail on execute a created order :: (wrong user)', async function() {
-    let itemPrice = web3.toWei(1.0, 'ether')
-
-    await market.createOrder(assetId, itemPrice, endTime, {
-      from: seller
-    })
-    await market
-      .executeOrder(assetId, itemPrice, { from: seller })
-      .should.be.rejectedWith(EVMRevert)
-  })
-
-  it('should fail execute a created order :: (expired)', async function() {
-    let itemPrice = web3.toWei(1.0, 'ether')
-
-    await market.createOrder(assetId, itemPrice, endTime, {
-      from: seller
+      await market.setPublicationFee(publicationFee, { from: owner })
+      let r = await market.publicationFeeInWei()
+      r.should.be.bignumber.equal(publicationFee)
     })
 
-    // move 10 mins ahead.
-    await increaseTime(600)
-    await market
-      .executeOrder(assetId, itemPrice, { from: buyer })
-      .should.be.rejectedWith(EVMRevert)
-  })
+    it('should fail to change publication Fee (not owner)', async function() {
+      let publicationFee = web3.toWei(0.005, 'ether')
 
-  // Test change publication Fees.
-  it('should change publication Fee', async function() {
-    let publicationFee = web3.toWei(0.005, 'ether')
-
-    await market.setPublicationFee(publicationFee, { from: owner })
-    let r = await market.publicationFeeInWei()
-    r.should.be.bignumber.equal(publicationFee)
-  })
-
-  it('should fail to change publication Fee (not owner)', async function() {
-    let publicationFee = web3.toWei(0.005, 'ether')
-
-    await market
-      .setPublicationFee(publicationFee, { from: seller })
-      .should.be.rejectedWith(EVMRevert)
+      await market
+        .setPublicationFee(publicationFee, { from: seller })
+        .should.be.rejectedWith(EVMRevert)
+    })
   })
 
   // Test owner sale cut.
-  it('should change owner sale cut', async function() {
-    let ownerCut = 10
+  describe('ownerCutPercentage', function() {
+    it('should change owner sale cut', async function() {
+      let ownerCut = 10
 
-    await market.setOwnerCut(ownerCut, { from: owner })
-    let r = await market.ownerCutPercentage()
-    r.should.be.bignumber.equal(ownerCut)
-  })
-
-  it('should fail to change owner cut (% invalid)', async function() {
-    let ownerCut = 200
-
-    await market
-      .setOwnerCut(ownerCut, { from: owner })
-      .should.be.rejectedWith(EVMRevert)
-  })
-
-  it('should fail to change owner cut (not owner)', async function() {
-    let ownerCut = 10
-
-    await market
-      .setOwnerCut(ownerCut, { from: seller })
-      .should.be.rejectedWith(EVMRevert)
-  })
-
-  // Test publish with fee
-
-  it('should publish with fee', async function() {
-    // Set token balances
-    erc20.setBalance(owner, web3.toWei(10.0, 'ether'))
-    erc20.setBalance(seller, web3.toWei(10.0, 'ether'))
-
-    let itemPrice = web3.toWei(1.0, 'ether')
-    let publicationFee = web3.toWei(0.5, 'ether')
-
-    let newEndtime = web3.eth.getBlock('latest').timestamp + duration.minutes(5)
-
-    await market.setPublicationFee(publicationFee, { from: owner })
-    await market.createOrder(assetId, itemPrice, newEndtime, {
-      from: seller
+      await market.setOwnerCut(ownerCut, { from: owner })
+      let r = await market.ownerCutPercentage()
+      r.should.be.bignumber.equal(ownerCut)
     })
 
-    let balancePost = await erc20.balanceOf(seller)
+    it('should fail to change owner cut (% invalid)', async function() {
+      let ownerCut = 200
 
-    balancePost.should.be.bignumber.equal(web3.toWei(9.5, 'ether'))
+      await market
+        .setOwnerCut(ownerCut, { from: owner })
+        .should.be.rejectedWith(EVMRevert)
+    })
+
+    it('should fail to change owner cut (not owner)', async function() {
+      let ownerCut = 10
+
+      await market
+        .setOwnerCut(ownerCut, { from: seller })
+        .should.be.rejectedWith(EVMRevert)
+    })
   })
 
-  it('should sell with owner sale cut', async function() {
-    // Set token balances
-    erc20.setBalance(owner, web3.toWei(10.0, 'ether'))
-    erc20.setBalance(buyer, web3.toWei(10.0, 'ether'))
-    erc20.setBalance(seller, web3.toWei(10.0, 'ether'))
+  describe('Create with fee', function() {
+    it('should publish with fee', async function() {
+      // Set token balances
+      erc20.setBalance(owner, web3.toWei(10.0, 'ether'))
+      erc20.setBalance(seller, web3.toWei(10.0, 'ether'))
 
-    let ownerCut = 10
-    let itemPrice = web3.toWei(1.0, 'ether')
-    let newEndtime = web3.eth.getBlock('latest').timestamp + duration.minutes(5)
+      let itemPrice = web3.toWei(1.0, 'ether')
+      let publicationFee = web3.toWei(0.5, 'ether')
 
-    await market.setOwnerCut(ownerCut, { from: owner })
-    await market.createOrder(assetId, itemPrice, newEndtime, {
-      from: seller
+      let newEndtime = web3.eth.getBlock('latest').timestamp + duration.minutes(5)
+
+      await market.setPublicationFee(publicationFee, { from: owner })
+      await market.createOrder(assetId, erc721.address, itemPrice, newEndtime, {
+        from: seller
+      })
+
+      let balancePost = await erc20.balanceOf(seller)
+
+      balancePost.should.be.bignumber.equal(web3.toWei(9.5, 'ether'))
     })
-    await market.executeOrder(assetId, itemPrice, { from: buyer })
+  })
+  
+  describe('Create with owner cut', function() {
+    it('should sell with owner sale cut', async function() {
+      // Set token balances
+      erc20.setBalance(owner, web3.toWei(10.0, 'ether'))
+      erc20.setBalance(buyer, web3.toWei(10.0, 'ether'))
+      erc20.setBalance(seller, web3.toWei(10.0, 'ether'))
 
-    // Verify balances
-    let ownerBalance = await erc20.balanceOf(owner)
-    ownerBalance.should.be.bignumber.equal(web3.toWei(10.1, 'ether'))
+      let ownerCut = 10
+      let itemPrice = web3.toWei(1.0, 'ether')
+      let newEndtime = web3.eth.getBlock('latest').timestamp + duration.minutes(5)
 
-    let sellerBalance = await erc20.balanceOf(seller)
-    sellerBalance.should.be.bignumber.equal(web3.toWei(10.9, 'ether'))
+      await market.setOwnerCut(ownerCut, { from: owner })
+      await market.createOrder(assetId, erc721.address, itemPrice, newEndtime, {
+        from: seller
+      })
+      await market.executeOrder(assetId, itemPrice, { from: buyer })
 
-    let buyerBalance = await erc20.balanceOf(buyer)
-    buyerBalance.should.be.bignumber.equal(web3.toWei(9.0, 'ether'))
+      // Verify balances
+      let ownerBalance = await erc20.balanceOf(owner)
+      ownerBalance.should.be.bignumber.equal(web3.toWei(10.1, 'ether'))
+
+      let sellerBalance = await erc20.balanceOf(seller)
+      sellerBalance.should.be.bignumber.equal(web3.toWei(10.9, 'ether'))
+
+      let buyerBalance = await erc20.balanceOf(buyer)
+      buyerBalance.should.be.bignumber.equal(web3.toWei(9.0, 'ether'))
+    })
   })
 })
