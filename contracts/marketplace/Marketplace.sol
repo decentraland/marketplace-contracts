@@ -26,8 +26,8 @@ contract Marketplace is Ownable, Pausable, Destructible {
 
   ERC20Interface public acceptedToken;
 
-  struct Auction {
-    // Auction ID
+  struct Order {
+    // Order ID
     bytes32 id;
     // Owner of the NFT
     address seller;
@@ -39,13 +39,13 @@ contract Marketplace is Ownable, Pausable, Destructible {
     uint256 expiresAt;
   }
 
-  mapping (uint256 => Auction) public auctionByAssetId;
+  mapping (uint256 => Order) public orderByAssetId;
 
   uint256 public ownerCutPercentage;
   uint256 public publicationFeeInWei;
 
   /* EVENTS */
-  event AuctionCreated(
+  event OrderCreated(
     bytes32 id,
     uint256 indexed assetId,
     address indexed seller, 
@@ -53,7 +53,7 @@ contract Marketplace is Ownable, Pausable, Destructible {
     uint256 priceInWei, 
     uint256 expiresAt
   );
-  event AuctionSuccessful(
+  event OrderSuccessful(
     bytes32 id,
     uint256 indexed assetId, 
     address indexed seller, 
@@ -61,7 +61,7 @@ contract Marketplace is Ownable, Pausable, Destructible {
     uint256 totalPrice, 
     address indexed winner
   );
-  event AuctionCancelled(
+  event OrderCancelled(
     bytes32 id,
     uint256 indexed assetId, 
     address indexed seller,
@@ -107,7 +107,7 @@ contract Marketplace is Ownable, Pausable, Destructible {
     * @param assetId - ID of the published NFT
     * @param nftAddress - Non fungible registry address
     * @param priceInWei - Price in Wei for the supported coin.
-    * @param expiresAt - Duration of the auction (in hours)
+    * @param expiresAt - Duration of the order (in hours)
     */
   function createOrder(uint256 assetId, address nftAddress, uint256 priceInWei, uint256 expiresAt) public whenNotPaused {
     require(isContract(nftAddress));
@@ -120,15 +120,15 @@ contract Marketplace is Ownable, Pausable, Destructible {
     require(priceInWei > 0);
     require(expiresAt > block.timestamp.add(1 minutes));
 
-    bytes32 auctionId = keccak256(
+    bytes32 orderId = keccak256(
       block.timestamp, 
       assetOwner,
       assetId, 
       priceInWei
     );
 
-    auctionByAssetId[assetId] = Auction({
-      id: auctionId,
+    orderByAssetId[assetId] = Order({
+      id: orderId,
       seller: assetOwner,
       nftAddress: nftAddress,
       price: priceInWei,
@@ -145,8 +145,8 @@ contract Marketplace is Ownable, Pausable, Destructible {
       );
     }
 
-    emit AuctionCreated(
-      auctionId,
+    emit OrderCreated(
+      orderId,
       assetId, 
       assetOwner,
       nftAddress,
@@ -161,14 +161,14 @@ contract Marketplace is Ownable, Pausable, Destructible {
     * @param assetId - ID of the published NFT
     */
   function cancelOrder(uint256 assetId) public whenNotPaused {
-    require(auctionByAssetId[assetId].seller == msg.sender || msg.sender == owner);
+    require(orderByAssetId[assetId].seller == msg.sender || msg.sender == owner);
 
-    bytes32 auctionId = auctionByAssetId[assetId].id;
-    address auctionSeller = auctionByAssetId[assetId].seller;
-    address nftAddress = auctionByAssetId[assetId].nftAddress;
-    delete auctionByAssetId[assetId];
+    bytes32 orderId = orderByAssetId[assetId].id;
+    address orderSeller = orderByAssetId[assetId].seller;
+    address nftAddress = orderByAssetId[assetId].nftAddress;
+    delete orderByAssetId[assetId];
 
-    emit AuctionCancelled(auctionId, assetId, auctionSeller, nftAddress);
+    emit OrderCancelled(orderId, assetId, orderSeller, nftAddress);
   }
 
   /**
@@ -177,15 +177,15 @@ contract Marketplace is Ownable, Pausable, Destructible {
     * @param price - Order price 
     */
   function executeOrder(uint256 assetId, uint256 price) public whenNotPaused {
-    address seller = auctionByAssetId[assetId].seller;
-    address nftAddress = auctionByAssetId[assetId].nftAddress;
+    address seller = orderByAssetId[assetId].seller;
+    address nftAddress = orderByAssetId[assetId].nftAddress;
 
     ERC721Interface nftRegistry = ERC721Interface(nftAddress);
 
     require(seller != address(0));
     require(seller != msg.sender);
-    require(auctionByAssetId[assetId].price == price);
-    require(block.timestamp < auctionByAssetId[assetId].expiresAt);
+    require(orderByAssetId[assetId].price == price);
+    require(block.timestamp < orderByAssetId[assetId].expiresAt);
     require(seller == nftRegistry.ownerOf(assetId));
 
     uint saleShareAmount = 0;
@@ -217,11 +217,11 @@ contract Marketplace is Ownable, Pausable, Destructible {
     );
 
 
-    bytes32 auctionId = auctionByAssetId[assetId].id;
-    delete auctionByAssetId[assetId];
+    bytes32 orderId = orderByAssetId[assetId].id;
+    delete orderByAssetId[assetId];
 
-    emit AuctionSuccessful(
-      auctionId,
+    emit OrderSuccessful(
+      orderId,
       assetId,
       seller,
       nftAddress,

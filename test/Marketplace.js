@@ -14,8 +14,8 @@ const Marketplace = artifacts.require('Marketplace')
 
 const { increaseTime, duration } = require('./helpers/increaseTime')
 
-function checkAuctionCreatedLog(log, assetId, seller, nftAddress, priceInWei, expiresAt) {
-  log.event.should.be.eq('AuctionCreated')
+function checkOrderCreatedLog(log, assetId, seller, nftAddress, priceInWei, expiresAt) {
+  log.event.should.be.eq('OrderCreated')
   log.args.assetId.should.be.bignumber.equal(assetId, 'assetId')
   log.args.seller.should.be.equal(seller, 'seller')
   log.args.nftAddress.should.be.equal(nftAddress, 'nftAddress')
@@ -23,15 +23,15 @@ function checkAuctionCreatedLog(log, assetId, seller, nftAddress, priceInWei, ex
   log.args.expiresAt.should.be.bignumber.equal(expiresAt, 'expiresAt')
 }
 
-function checkAuctionCancelledLog(log, assetId, seller, nftAddress) {
-  log.event.should.be.eq('AuctionCancelled')
+function checkOrderCancelledLog(log, assetId, seller, nftAddress) {
+  log.event.should.be.eq('OrderCancelled')
   log.args.assetId.should.be.bignumber.equal(assetId, 'assetId')
   log.args.seller.should.be.equal(seller, 'seller')
   log.args.nftAddress.should.be.equal(nftAddress, 'nftAddress')
 }
 
-function checkAuctionSuccessfulLog(log, assetId, seller, nftAddress, totalPrice, winner) {
-  log.event.should.be.eq('AuctionSuccessful')
+function checkOrderSuccessfulLog(log, assetId, seller, nftAddress, totalPrice, winner) {
+  log.event.should.be.eq('OrderSuccessful')
   log.args.assetId.should.be.bignumber.equal(assetId, 'assetId')
   log.args.seller.should.be.equal(seller, 'seller')
   log.args.nftAddress.should.be.equal(nftAddress, 'nftAddress')
@@ -83,10 +83,10 @@ contract('Marketplace', function([_, owner, seller, buyer]) {
 
       // Event emitted
       logs.length.should.be.equal(1)
-      checkAuctionCreatedLog(logs[0], assetId, seller, erc721.address, itemPrice, endTime)
+      checkOrderCreatedLog(logs[0], assetId, seller, erc721.address, itemPrice, endTime)
 
       // Check data
-      let s = await market.auctionByAssetId(assetId)
+      let s = await market.orderByAssetId(assetId)
       s[1].should.be.equal(seller)
       s[2].should.be.equal(erc721.address)
       s[3].should.be.bignumber.equal(itemPrice)
@@ -103,10 +103,10 @@ contract('Marketplace', function([_, owner, seller, buyer]) {
 
       // Event emitted
       logs.length.should.be.equal(1)
-      checkAuctionCreatedLog(logs[0], assetId, seller, erc721.address, newPrice, newEndTime)
+      checkOrderCreatedLog(logs[0], assetId, seller, erc721.address, newPrice, newEndTime)
 
       // Check data
-      let s = await market.auctionByAssetId(assetId)
+      let s = await market.orderByAssetId(assetId)
       s[1].should.be.equal(seller)
       s[2].should.be.equal(erc721.address)
       s[3].should.be.bignumber.equal(newPrice)
@@ -135,7 +135,7 @@ contract('Marketplace', function([_, owner, seller, buyer]) {
 
       // Event emitted
       logs.length.should.be.equal(1)
-      checkAuctionCancelledLog(logs[0], assetId, seller, erc721.address)
+      checkOrderCancelledLog(logs[0], assetId, seller, erc721.address)
     })
 
     it('should fail canceling an order :: (wrong user)', async function() {
@@ -161,7 +161,7 @@ contract('Marketplace', function([_, owner, seller, buyer]) {
 
       // Event emitted
       logs.length.should.be.equal(1)
-      checkAuctionSuccessfulLog(logs[0], assetId, seller, erc721.address, itemPrice, buyer)
+      checkOrderSuccessfulLog(logs[0], assetId, seller, erc721.address, itemPrice, buyer)
     })
 
     it('should fail on execute a created order :: (wrong user)', async function() {
