@@ -10,7 +10,7 @@ const EVMRevert = 'VM Exception while processing transaction: revert'
 
 const ERC20Token = artifacts.require('FakeERC20')
 const ERC721Token = artifacts.require("FakeERC721");
-const Marketplace = artifacts.require('Marketplace')
+const Marketplace = artifacts.require('FakeMarketplace')
 
 const { increaseTime, duration } = require('./helpers/increaseTime')
 
@@ -113,7 +113,7 @@ contract('Marketplace', function([_, owner, seller, buyer]) {
       s[4].should.be.bignumber.equal(newEndTime)
     })
 
-    it('should fail to create an order :: (not a contract)', async function() {
+    it('should fail to create an order :: (not an ERC721 contract)', async function() {
       let itemPrice = web3.toWei(1.0, 'ether')
 
       await market
@@ -273,16 +273,28 @@ contract('Marketplace', function([_, owner, seller, buyer]) {
         from: seller
       })
       await market.executeOrder(assetId, itemPrice, { from: buyer })
-
+      
       // Verify balances
       let ownerBalance = await erc20.balanceOf(owner)
       ownerBalance.should.be.bignumber.equal(web3.toWei(10.1, 'ether'))
-
+      
       let sellerBalance = await erc20.balanceOf(seller)
       sellerBalance.should.be.bignumber.equal(web3.toWei(10.9, 'ether'))
-
+      
       let buyerBalance = await erc20.balanceOf(buyer)
       buyerBalance.should.be.bignumber.equal(web3.toWei(9.0, 'ether'))
+    })
+  })
+  
+  describe('isContract', function () {
+    it('should return true if the addres is a contract', async function() {
+      await market._isContract(erc20.address).should.eventually.be.true
+      await market._isContract(erc721.address).should.eventually.be.true
+    })
+    
+    it('should return false if the addres is not a contract', async function() {
+      await market._isContract(seller).should.eventually.be.false
+      await market._isContract(buyer).should.eventually.be.false
     })
   })
 })
