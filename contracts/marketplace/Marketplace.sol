@@ -113,10 +113,7 @@ contract Marketplace is Ownable, Pausable, Destructible {
     require(expiresAt > block.timestamp.add(1 minutes));
 
     bytes32 orderId = keccak256(
-      block.timestamp,
-      assetOwner,
-      assetId,
-      priceInWei
+      abi.encodePacked(block.timestamp, assetOwner, assetId, priceInWei)
     );
 
     orderByAssetId[assetId] = Order({
