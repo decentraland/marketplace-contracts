@@ -40,22 +40,22 @@ contract Marketplace is Ownable, Pausable, Destructible {
   event OrderCreated(
     bytes32 id,
     uint256 indexed assetId,
-    address indexed seller, 
-    address nftAddress, 
-    uint256 priceInWei, 
+    address indexed seller,
+    address nftAddress,
+    uint256 priceInWei,
     uint256 expiresAt
   );
   event OrderSuccessful(
     bytes32 id,
-    uint256 indexed assetId, 
-    address indexed seller, 
-    address nftAddress, 
-    uint256 totalPrice, 
+    uint256 indexed assetId,
+    address indexed seller,
+    address nftAddress,
+    uint256 totalPrice,
     address indexed winner
   );
   event OrderCancelled(
     bytes32 id,
-    uint256 indexed assetId, 
+    uint256 indexed assetId,
     address indexed seller,
     address nftAddress
   );
@@ -64,7 +64,7 @@ contract Marketplace is Ownable, Pausable, Destructible {
   event ChangedOwnerCut(uint256 ownerCut);
 
   /**
-    * @dev Constructor for this contract.
+    * @dev Constructor for this contract
     * @param _acceptedToken - Address of the ERC20 accepted for this marketplace
     */
   constructor(address _acceptedToken) public {
@@ -83,7 +83,7 @@ contract Marketplace is Ownable, Pausable, Destructible {
 
   /**
     * @dev Sets the share cut for the owner of the contract that's
-    *  charged to the seller on a successful sale.
+    *  charged to the seller on a successful sale
     * @param ownerCut - Share amount, from 0 to 100
     */
   function setOwnerCut(uint8 ownerCut) onlyOwner public {
@@ -98,7 +98,7 @@ contract Marketplace is Ownable, Pausable, Destructible {
     * @dev Cancel an already published order
     * @param assetId - ID of the published NFT
     * @param nftAddress - Non fungible registry address
-    * @param priceInWei - Price in Wei for the supported coin.
+    * @param priceInWei - Price in Wei for the supported coin
     * @param expiresAt - Duration of the order (in hours)
     */
   function createOrder(uint256 assetId, address nftAddress, uint256 priceInWei, uint256 expiresAt) public whenNotPaused {
@@ -113,9 +113,9 @@ contract Marketplace is Ownable, Pausable, Destructible {
     require(expiresAt > block.timestamp.add(1 minutes));
 
     bytes32 orderId = keccak256(
-      block.timestamp, 
+      block.timestamp,
       assetOwner,
-      assetId, 
+      assetId,
       priceInWei
     );
 
@@ -128,7 +128,7 @@ contract Marketplace is Ownable, Pausable, Destructible {
     });
 
     // Check if there's a publication fee and
-    // transfer the amount to marketplace owner.
+    // transfer the amount to marketplace owner
     if (publicationFeeInWei > 0) {
       acceptedToken.transferFrom(
         msg.sender,
@@ -139,17 +139,17 @@ contract Marketplace is Ownable, Pausable, Destructible {
 
     emit OrderCreated(
       orderId,
-      assetId, 
+      assetId,
       assetOwner,
       nftAddress,
-      priceInWei, 
+      priceInWei,
       expiresAt
     );
   }
 
   /**
     * @dev Cancel an already published order
-    *  can only be canceled by seller or the contract owner.
+    *  can only be canceled by seller or the contract owner
     * @param assetId - ID of the published NFT
     */
   function cancelOrder(uint256 assetId) public whenNotPaused {
@@ -166,7 +166,7 @@ contract Marketplace is Ownable, Pausable, Destructible {
   /**
     * @dev Executes the sale for a published NTF
     * @param assetId - ID of the published NFT
-    * @param price - Order price 
+    * @param price - Order price
     */
   function executeOrder(uint256 assetId, uint256 price) public whenNotPaused {
     address seller = orderByAssetId[assetId].seller;
@@ -186,7 +186,7 @@ contract Marketplace is Ownable, Pausable, Destructible {
       // Calculate sale share
       saleShareAmount = price.mul(ownerCutPercentage).div(100);
 
-      // Transfer share amount for marketplace Owner.
+      // Transfer share amount for marketplace Owner
       acceptedToken.transferFrom(
         msg.sender,
         owner,
@@ -224,7 +224,7 @@ contract Marketplace is Ownable, Pausable, Destructible {
 
   function isContract(address addr) internal view returns (bool) {
     uint256 size;
-    assembly { size := extcodesize(addr) }  
+    assembly { size := extcodesize(addr) }
     return size > 0;
   }
 }
