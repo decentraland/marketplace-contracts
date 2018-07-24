@@ -90,7 +90,7 @@ contract Marketplace is Ownable, Pausable, Destructible {
     * @param ownerCut - Share amount, from 0 to 100
     */
   function setOwnerCut(uint8 ownerCut) public onlyOwner {
-    require(ownerCut >= 0 && ownerCut < 100, "The owner cut should be between 0 to 100");
+    require(ownerCut < 100, "The owner cut should be between 0 to 100");
 
     ownerCutPercentage = ownerCut;
 

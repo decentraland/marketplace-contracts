@@ -197,6 +197,15 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
         .cancelOrder(erc721.address, assetId, { from: buyer })
         .should.be.rejectedWith(EVMRevert)
     })
+
+    it('should fail canceling an order :: (wrong address)', async function() {
+      await market.createOrder(assetId, erc721.address, itemPrice, endTime, {
+        from: seller
+      })
+      await market
+        .cancelOrder(erc20.address, assetId, { from: seller })
+        .should.be.rejectedWith(EVMRevert)
+    })
   })
 
   describe('Execute', function() {
@@ -226,6 +235,15 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
       })
       await market
         .executeOrder(erc721.address, assetId, itemPrice, { from: seller })
+        .should.be.rejectedWith(EVMRevert)
+    })
+
+    it('should fail on execute a created order :: (wrong address)', async function() {
+      await market.createOrder(assetId, erc721.address, itemPrice, endTime, {
+        from: seller
+      })
+      await market
+        .executeOrder(erc20.address, assetId, itemPrice, { from: buyer })
         .should.be.rejectedWith(EVMRevert)
     })
 
@@ -270,7 +288,7 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
       r.should.be.bignumber.equal(ownerCut)
     })
 
-    it('should fail to change owner cut (% invalid)', async function() {
+    it('should fail to change owner cut (% invalid above)', async function() {
       let ownerCut = 200
 
       await market
