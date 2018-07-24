@@ -10,6 +10,7 @@
     "dotenv": "^6.0.0",
     "ethereumjs-abi": "^0.6.5",
     "ganache-cli": "^6.1.0",
+    "solium": "^1.1.8",
     "truffle": "^4.1.11",
     "truffle-hdwallet-provider": "0.0.5"
   },

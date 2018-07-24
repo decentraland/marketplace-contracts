@@ -6,12 +6,14 @@ import "openzeppelin-solidity/contracts/lifecycle/Destructible.sol";
 import "openzeppelin-solidity/contracts/math/SafeMath.sol";
 import "openzeppelin-solidity/contracts/token/ERC721/ERC721Token.sol";
 
+
 /**
  * @title Interface for contracts conforming to ERC-20
  */
 contract ERC20Interface {
   function transferFrom(address from, address to, uint tokens) public returns (bool success);
 }
+
 
 contract Marketplace is Ownable, Pausable, Destructible {
   using SafeMath for uint256;
@@ -31,7 +33,8 @@ contract Marketplace is Ownable, Pausable, Destructible {
     uint256 expiresAt;
   }
 
-  mapping (uint256 => Order) public orderByAssetId;
+  // From ERC721 registry assetId to Order (to avoid asset collision)
+  mapping (address => mapping(uint256 => Order)) public orderByAssetId;
 
   uint256 public ownerCutPercentage;
   uint256 public publicationFeeInWei;
@@ -75,7 +78,7 @@ contract Marketplace is Ownable, Pausable, Destructible {
     * @dev Sets the publication fee that's charged to users to publish items
     * @param publicationFee - Fee amount in wei this contract charges to publish an item
     */
-  function setPublicationFee(uint256 publicationFee) onlyOwner public {
+  function setPublicationFee(uint256 publicationFee) public onlyOwner {
     publicationFeeInWei = publicationFee;
 
     emit ChangedPublicationFee(publicationFeeInWei);
@@ -86,8 +89,8 @@ contract Marketplace is Ownable, Pausable, Destructible {
     *  charged to the seller on a successful sale
     * @param ownerCut - Share amount, from 0 to 100
     */
-  function setOwnerCut(uint8 ownerCut) onlyOwner public {
-    require(ownerCut < 100);
+  function setOwnerCut(uint8 ownerCut) public onlyOwner {
+    require(ownerCut >= 0 && ownerCut < 100, "The owner cut should be between 0 to 100");
 
     ownerCutPercentage = ownerCut;
 
@@ -101,22 +104,38 @@ contract Marketplace is Ownable, Pausable, Destructible {
     * @param priceInWei - Price in Wei for the supported coin
     * @param expiresAt - Duration of the order (in hours)
     */
-  function createOrder(uint256 assetId, address nftAddress, uint256 priceInWei, uint256 expiresAt) public whenNotPaused {
-    require(isContract(nftAddress));
+  function createOrder(
+    uint256 assetId,
+    address nftAddress,
+    uint256 priceInWei,
+    uint256 expiresAt
+  )
+    public
+    whenNotPaused
+  {
+    require(isContract(nftAddress), "The NFT Address should be a contract");
 
     ERC721 nftRegistry = ERC721(nftAddress);
     address assetOwner = nftRegistry.ownerOf(assetId);
 
-    require(msg.sender == assetOwner);
-    require(nftRegistry.isApprovedForAll(assetOwner, address(this)));
-    require(priceInWei > 0);
-    require(expiresAt > block.timestamp.add(1 minutes));
+    require(msg.sender == assetOwner, "Only the owner can create orders");
+    require(
+      nftRegistry.isApprovedForAll(assetOwner, address(this)),
+      "The contract is not authorized to manage the asset"
+    );
+    require(priceInWei > 0, "Price should be bigger than 0");
+    require(expiresAt > block.timestamp.add(1 minutes), "Expires should be bigger than 1 minute");
 
     bytes32 orderId = keccak256(
-      abi.encodePacked(block.timestamp, assetOwner, assetId, priceInWei)
+      abi.encodePacked(
+        block.timestamp,
+        assetOwner,
+        assetId,
+        priceInWei
+      )
     );
 
-    orderByAssetId[assetId] = Order({
+    orderByAssetId[nftAddress][assetId] = Order({
       id: orderId,
       seller: assetOwner,
       nftAddress: nftAddress,
@@ -147,35 +166,47 @@ contract Marketplace is Ownable, Pausable, Destructible {
   /**
     * @dev Cancel an already published order
     *  can only be canceled by seller or the contract owner
+    * @param nftAddress - Address of the NFT registry
     * @param assetId - ID of the published NFT
     */
-  function cancelOrder(uint256 assetId) public whenNotPaused {
-    require(orderByAssetId[assetId].seller == msg.sender || msg.sender == owner);
+  function cancelOrder(address nftAddress, uint256 assetId) public whenNotPaused {
+    Order storage order = orderByAssetId[nftAddress][assetId];
 
-    bytes32 orderId = orderByAssetId[assetId].id;
-    address orderSeller = orderByAssetId[assetId].seller;
-    address nftAddress = orderByAssetId[assetId].nftAddress;
-    delete orderByAssetId[assetId];
+    require(order.id != 0, "Asset not published");
+    require(order.seller == msg.sender || msg.sender == owner, "Unauthorized user");
 
-    emit OrderCancelled(orderId, assetId, orderSeller, nftAddress);
+    bytes32 orderId = order.id;
+    address orderSeller = order.seller;
+    address orderNftAddress = order.nftAddress;
+    delete orderByAssetId[nftAddress][assetId];
+
+    emit OrderCancelled(
+      orderId,
+      assetId,
+      orderSeller,
+      orderNftAddress
+    );
   }
 
   /**
     * @dev Executes the sale for a published NTF
+    * @param nftAddress - Address of the NFT registry
     * @param assetId - ID of the published NFT
     * @param price - Order price
     */
-  function executeOrder(uint256 assetId, uint256 price) public whenNotPaused {
-    address seller = orderByAssetId[assetId].seller;
-    address nftAddress = orderByAssetId[assetId].nftAddress;
+  function executeOrder(address nftAddress, uint256 assetId, uint256 price) public whenNotPaused {
+    Order storage order = orderByAssetId[nftAddress][assetId];
 
+    require(order.id != 0, "Asset not published");
+
+    address seller = order.seller;
     ERC721 nftRegistry = ERC721(nftAddress);
 
-    require(seller != address(0));
-    require(seller != msg.sender);
-    require(orderByAssetId[assetId].price == price);
-    require(block.timestamp < orderByAssetId[assetId].expiresAt);
-    require(seller == nftRegistry.ownerOf(assetId));
+    require(seller != address(0), "Invalid address");
+    require(seller != msg.sender, "Unauthorized user");
+    require(order.price == price, "The price is not correct");
+    require(block.timestamp < order.expiresAt, "The order expired");
+    require(seller == nftRegistry.ownerOf(assetId), "The seller is no longer the owner");
 
     uint saleShareAmount = 0;
 
@@ -206,8 +237,8 @@ contract Marketplace is Ownable, Pausable, Destructible {
     );
 
 
-    bytes32 orderId = orderByAssetId[assetId].id;
-    delete orderByAssetId[assetId];
+    bytes32 orderId = order.id;
+    delete orderByAssetId[nftAddress][assetId];
 
     emit OrderSuccessful(
       orderId,
@@ -221,6 +252,7 @@ contract Marketplace is Ownable, Pausable, Destructible {
 
   function isContract(address addr) internal view returns (bool) {
     uint256 size;
+    // solium-disable-next-line security/no-inline-assembly
     assembly { size := extcodesize(addr) }
     return size > 0;
   }

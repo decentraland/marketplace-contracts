@@ -111,7 +111,7 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
       )
 
       // Check data
-      let s = await market.orderByAssetId(assetId)
+      let s = await market.orderByAssetId.call(erc721.address, assetId)
       s[1].should.be.equal(seller)
       s[2].should.be.equal(erc721.address)
       s[3].should.be.bignumber.equal(itemPrice)
@@ -142,7 +142,7 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
       )
 
       // Check data
-      let s = await market.orderByAssetId(assetId)
+      let s = await market.orderByAssetId.call(erc721.address, assetId)
       s[1].should.be.equal(seller)
       s[2].should.be.equal(erc721.address)
       s[3].should.be.bignumber.equal(newPrice)
@@ -182,7 +182,7 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
       await market.createOrder(assetId, erc721.address, itemPrice, endTime, {
         from: seller
       })
-      const { logs } = await market.cancelOrder(assetId, { from: seller })
+      const { logs } = await market.cancelOrder(erc721.address, assetId, { from: seller })
 
       // Event emitted
       logs.length.should.be.equal(1)
@@ -194,7 +194,7 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
         from: seller
       })
       await market
-        .cancelOrder(assetId, { from: buyer })
+        .cancelOrder(erc721.address, assetId, { from: buyer })
         .should.be.rejectedWith(EVMRevert)
     })
   })
@@ -204,7 +204,7 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
       await market.createOrder(assetId, erc721.address, itemPrice, endTime, {
         from: seller
       })
-      const { logs } = await market.executeOrder(assetId, itemPrice, {
+      const { logs } = await market.executeOrder(erc721.address, assetId, itemPrice, {
         from: buyer
       })
 
@@ -225,7 +225,7 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
         from: seller
       })
       await market
-        .executeOrder(assetId, itemPrice, { from: seller })
+        .executeOrder(erc721.address, assetId, itemPrice, { from: seller })
         .should.be.rejectedWith(EVMRevert)
     })
 
@@ -237,7 +237,7 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
       // move 10 mins ahead.
       await increaseTime(600)
       await market
-        .executeOrder(assetId, itemPrice, { from: buyer })
+        .executeOrder(erc721.address, assetId, itemPrice, { from: buyer })
         .should.be.rejectedWith(EVMRevert)
     })
   })
@@ -321,7 +321,7 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
       await market.createOrder(assetId, erc721.address, itemPrice, endTime, {
         from: seller
       })
-      await market.executeOrder(assetId, itemPrice, { from: buyer })
+      await market.executeOrder(erc721.address, assetId, itemPrice, { from: buyer })
 
       // Verify balances
       let ownerBalance = await erc20.balanceOf(owner)
