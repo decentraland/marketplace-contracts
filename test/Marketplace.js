@@ -182,7 +182,9 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
       await market.createOrder(assetId, erc721.address, itemPrice, endTime, {
         from: seller
       })
-      const { logs } = await market.cancelOrder(erc721.address, assetId, { from: seller })
+      const { logs } = await market.cancelOrder(erc721.address, assetId, {
+        from: seller
+      })
 
       // Event emitted
       logs.length.should.be.equal(1)
@@ -213,9 +215,14 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
       await market.createOrder(assetId, erc721.address, itemPrice, endTime, {
         from: seller
       })
-      const { logs } = await market.executeOrder(erc721.address, assetId, itemPrice, {
-        from: buyer
-      })
+      const { logs } = await market.executeOrder(
+        erc721.address,
+        assetId,
+        itemPrice,
+        {
+          from: buyer
+        }
+      )
 
       // Event emitted
       logs.length.should.be.equal(1)
@@ -339,7 +346,9 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
       await market.createOrder(assetId, erc721.address, itemPrice, endTime, {
         from: seller
       })
-      await market.executeOrder(erc721.address, assetId, itemPrice, { from: buyer })
+      await market.executeOrder(erc721.address, assetId, itemPrice, {
+        from: buyer
+      })
 
       // Verify balances
       let ownerBalance = await erc20.balanceOf(owner)

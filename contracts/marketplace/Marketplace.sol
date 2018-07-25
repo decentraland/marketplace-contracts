@@ -120,7 +120,7 @@ contract Marketplace is Ownable, Pausable, Destructible {
 
     require(msg.sender == assetOwner, "Only the owner can create orders");
     require(
-      nftRegistry.isApprovedForAll(assetOwner, address(this)),
+      nftRegistry.getApproved(assetId) == address(this) || nftRegistry.isApprovedForAll(assetOwner, address(this)),
       "The contract is not authorized to manage the asset"
     );
     require(priceInWei > 0, "Price should be bigger than 0");

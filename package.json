@@ -15,7 +15,9 @@
     "truffle-hdwallet-provider": "0.0.5"
   },
   "scripts": {
-    "test": "scripts/test.sh"
+    "test": "scripts/test.sh",
+    "lint": "npx solium -d contracts",
+    "lint:fix": "npx solium -d contracts --fix"
   },
   "author": "Christian Hentschel",
   "license": "ISC",
