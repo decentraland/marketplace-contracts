@@ -170,7 +170,7 @@ contract Marketplace is Ownable, Pausable, Destructible {
     * @param assetId - ID of the published NFT
     */
   function cancelOrder(address nftAddress, uint256 assetId) public whenNotPaused {
-    Order storage order = orderByAssetId[nftAddress][assetId];
+    Order memory order = orderByAssetId[nftAddress][assetId];
 
     require(order.id != 0, "Asset not published");
     require(order.seller == msg.sender || msg.sender == owner, "Unauthorized user");
@@ -195,7 +195,7 @@ contract Marketplace is Ownable, Pausable, Destructible {
     * @param price - Order price
     */
   function executeOrder(address nftAddress, uint256 assetId, uint256 price) public whenNotPaused {
-    Order storage order = orderByAssetId[nftAddress][assetId];
+    Order memory order = orderByAssetId[nftAddress][assetId];
 
     require(order.id != 0, "Asset not published");
 
