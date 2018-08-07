@@ -361,16 +361,4 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
       buyerBalance.should.be.bignumber.equal(web3.toWei(9.0, 'ether'))
     })
   })
-
-  describe('isContract', function() {
-    it('should return true if the addres is a contract', async function() {
-      await market._isContract(erc20.address).should.eventually.be.true
-      await market._isContract(erc721.address).should.eventually.be.true
-    })
-
-    it('should return false if the addres is not a contract', async function() {
-      await market._isContract(seller).should.eventually.be.false
-      await market._isContract(buyer).should.eventually.be.false
-    })
-  })
 })

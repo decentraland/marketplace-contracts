@@ -4,7 +4,7 @@ import "openzeppelin-solidity/contracts/ownership/Ownable.sol";
 import "openzeppelin-solidity/contracts/lifecycle/Pausable.sol";
 import "openzeppelin-solidity/contracts/lifecycle/Destructible.sol";
 import "openzeppelin-solidity/contracts/math/SafeMath.sol";
-import "openzeppelin-solidity/contracts/token/ERC721/ERC721Token.sol";
+import "openzeppelin-solidity/contracts/AddressUtils.sol";
 
 
 /**
@@ -14,9 +14,21 @@ contract ERC20Interface {
   function transferFrom(address from, address to, uint tokens) public returns (bool success);
 }
 
+/**
+ * @title Interface for contracts conforming to ERC-721
+ */
+contract ERC721Interface {
+  function ownerOf(uint256 _tokenId) public view returns (address _owner);
+  function approve(address _to, uint256 _tokenId) public;
+  function getApproved(uint256 _tokenId) public view returns (address);
+  function isApprovedForAll(address _owner, address _operator) public view returns (bool);
+  function safeTransferFrom(address _from, address _to, uint256 _tokenId) public;
+}
+
 
 contract Marketplace is Ownable, Pausable, Destructible {
   using SafeMath for uint256;
+  using AddressUtils for address;
 
   ERC20Interface public acceptedToken;
 
@@ -113,9 +125,9 @@ contract Marketplace is Ownable, Pausable, Destructible {
     public
     whenNotPaused
   {
-    require(isContract(nftAddress), "The NFT Address should be a contract");
+    require(nftAddress.isContract(), "The NFT Address should be a contract");
 
-    ERC721 nftRegistry = ERC721(nftAddress);
+    ERC721Interface nftRegistry = ERC721Interface(nftAddress);
     address assetOwner = nftRegistry.ownerOf(assetId);
 
     require(msg.sender == assetOwner, "Only the owner can create orders");
@@ -200,7 +212,7 @@ contract Marketplace is Ownable, Pausable, Destructible {
     require(order.id != 0, "Asset not published");
 
     address seller = order.seller;
-    ERC721 nftRegistry = ERC721(nftAddress);
+    ERC721Interface nftRegistry = ERC721Interface(nftAddress);
 
     require(seller != address(0), "Invalid address");
     require(seller != msg.sender, "Unauthorized user");
@@ -236,7 +248,6 @@ contract Marketplace is Ownable, Pausable, Destructible {
       assetId
     );
 
-
     bytes32 orderId = order.id;
     delete orderByAssetId[nftAddress][assetId];
 
@@ -248,12 +259,5 @@ contract Marketplace is Ownable, Pausable, Destructible {
       price,
       msg.sender
     );
-  }
-
-  function isContract(address addr) internal view returns (bool) {
-    uint256 size;
-    // solium-disable-next-line security/no-inline-assembly
-    assembly { size := extcodesize(addr) }
-    return size > 0;
   }
 }
