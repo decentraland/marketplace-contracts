@@ -143,6 +143,7 @@ contract Marketplace is Ownable, Pausable, Destructible {
         block.timestamp,
         assetOwner,
         assetId,
+        nftAddress,
         priceInWei
       )
     );
