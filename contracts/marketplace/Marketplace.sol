@@ -14,6 +14,7 @@ contract ERC20Interface {
   function transferFrom(address from, address to, uint tokens) public returns (bool success);
 }
 
+
 /**
  * @title Interface for contracts conforming to ERC-721
  */
