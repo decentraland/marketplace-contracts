@@ -1,4 +1,4 @@
-pragma solidity ^0.4.23;
+pragma solidity ^0.4.24;
 
 import "openzeppelin-solidity/contracts/ownership/Ownable.sol";
 import "openzeppelin-solidity/contracts/lifecycle/Pausable.sol";
@@ -24,6 +24,12 @@ contract ERC721Interface {
   function getApproved(uint256 _tokenId) public view returns (address);
   function isApprovedForAll(address _owner, address _operator) public view returns (bool);
   function safeTransferFrom(address _from, address _to, uint256 _tokenId) public;
+  function supportsInterface(bytes4) public view returns (bool);
+}
+
+
+contract ERC721Verifiable is ERC721Interface {
+  function verifyFingerprint(uint256, bytes) public view returns (bool);
 }
 
 
@@ -51,6 +57,10 @@ contract Marketplace is Ownable, Pausable, Destructible {
 
   uint256 public ownerCutPercentage;
   uint256 public publicationFeeInWei;
+
+  bytes4 public constant InterfaceId_ValidateFingerprint = bytes4(
+    keccak256("verifyFingerprint(uint256,bytes)")
+  );
 
   /* EVENTS */
   event OrderCreated(
@@ -203,12 +213,65 @@ contract Marketplace is Ownable, Pausable, Destructible {
   }
 
   /**
+    * @dev Executes the sale for a published NTF and checks for the asset fingerprint
+    * @param nftAddress - Address of the NFT registry
+    * @param assetId - ID of the published NFT
+    * @param price - Order price
+    * @param fingerprint - Verification info for the asset
+    */
+  function safeExecuteOrder(
+    address nftAddress,
+    uint256 assetId,
+    uint256 price,
+    bytes fingerprint
+  )
+   public
+   whenNotPaused
+  {
+    ERC721Verifiable verifiableNftRegistry = ERC721Verifiable(nftAddress);
+
+    require(
+      verifiableNftRegistry.supportsInterface(InterfaceId_ValidateFingerprint),
+      'NFT registry does not support creating fingerprints'
+    );
+    require(
+      verifiableNftRegistry.verifyFingerprint(assetId, fingerprint),
+      "The asset fingerprint is not valid"
+    );
+
+    _executeOrder(nftAddress, assetId, price);
+  }
+
+  /**
     * @dev Executes the sale for a published NTF
     * @param nftAddress - Address of the NFT registry
     * @param assetId - ID of the published NFT
     * @param price - Order price
     */
-  function executeOrder(address nftAddress, uint256 assetId, uint256 price) public whenNotPaused {
+  function executeOrder(
+    address nftAddress,
+    uint256 assetId,
+    uint256 price
+  )
+   public
+   whenNotPaused
+  {
+    _executeOrder(nftAddress, assetId, price);
+  }
+
+  /**
+    * @dev Executes the sale for a published NTF
+    * @param nftAddress - Address of the NFT registry
+    * @param assetId - ID of the published NFT
+    * @param price - Order price
+    */
+  function _executeOrder(
+    address nftAddress,
+    uint256 assetId,
+    uint256 price
+  )
+   internal
+  {
     Order memory order = orderByAssetId[nftAddress][assetId];
 
     require(order.id != 0, "Asset not published");

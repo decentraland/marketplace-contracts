@@ -3,6 +3,7 @@
   "plugins": ["security"],
   "rules": {
     "security/no-block-members": "off",
+    "uppercase": "off",
     "quotes": ["error", "double"],
     "max-len": ["warning", 100],
     "indentation": ["error", 2],
