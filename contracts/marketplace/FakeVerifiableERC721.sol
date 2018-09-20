@@ -5,10 +5,7 @@ import "./FakeERC721.sol";
 
 contract FakeVerifiableERC721 is FakeERC721 {
   constructor(string name, string symbol) public
-  FakeERC721(name, symbol)
-  {
-    _registerInterface(bytes4(keccak256("verifyFingerprint(uint256,bytes)")));
-  }
+  FakeERC721(name, symbol) {}
 
   function verifyFingerprint(uint256 assetId, bytes fingerprint) public pure returns (bool) {
     return getFingerprint(assetId) == _bytesToBytes32(fingerprint);
@@ -16,6 +13,12 @@ contract FakeVerifiableERC721 is FakeERC721 {
 
   function getFingerprint(uint256 /*assetId*/) public pure returns (bytes32) {
     return 0x1234;
+  }
+
+  function _supportsInterface(bytes4 _interfaceId) internal view returns (bool) {
+    // solium-disable-next-line operator-whitespace
+    return super._supportsInterface(_interfaceId) ||
+      _interfaceId == bytes4(keccak256("verifyFingerprint(uint256,bytes)"));
   }
 
   function _bytesToBytes32(bytes b) internal pure returns (bytes32) {
