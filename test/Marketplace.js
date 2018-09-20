@@ -198,12 +198,25 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
   })
 
   describe('Cancel', function() {
-    it('should cancel a created order', async function() {
+    it('should let the seller cancel a created order', async function() {
       await market.createOrder(erc721.address, assetId, itemPrice, endTime, {
         from: seller
       })
       const { logs } = await market.cancelOrder(erc721.address, assetId, {
         from: seller
+      })
+
+      // Event emitted
+      logs.length.should.be.equal(1)
+      checkOrderCancelledLog(logs[0], assetId, seller, erc721.address)
+    })
+
+    it('should let the contract owner cancel a created order', async function() {
+      await market.createOrder(erc721.address, assetId, itemPrice, endTime, {
+        from: seller
+      })
+      const { logs } = await market.cancelOrder(erc721.address, assetId, {
+        from: owner
       })
 
       // Event emitted
@@ -226,6 +239,17 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
       })
       await market
         .cancelOrder(erc20.address, assetId, { from: seller })
+        .should.be.rejectedWith(EVMRevert)
+    })
+
+    it('should fail canceling an order :: (double cancel)', async function() {
+      await market.createOrder(erc721.address, assetId, itemPrice, endTime, {
+        from: seller
+      })
+      await market.cancelOrder(erc721.address, assetId, { from: seller })
+
+      await market
+        .cancelOrder(erc721.address, assetId, { from: seller })
         .should.be.rejectedWith(EVMRevert)
     })
   })
@@ -281,6 +305,19 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
 
       // move an hour ahead
       await increaseTime(3600)
+      await market
+        .executeOrder(erc721.address, assetId, itemPrice, { from: buyer })
+        .should.be.rejectedWith(EVMRevert)
+    })
+
+    it.only('should fail on execute a created order :: (double execute)', async function() {
+      await market.createOrder(erc721.address, assetId, itemPrice, endTime, {
+        from: seller
+      })
+      await market.executeOrder(erc721.address, assetId, itemPrice, {
+        from: buyer
+      })
+
       await market
         .executeOrder(erc721.address, assetId, itemPrice, { from: buyer })
         .should.be.rejectedWith(EVMRevert)
