@@ -9,17 +9,21 @@
     "chai-bignumber": "^2.0.2",
     "dotenv": "^6.0.0",
     "ethereumjs-abi": "^0.6.5",
-    "ganache-cli": "^6.1.0",
-    "truffle": "^4.1.11",
+    "ganache-cli": "^6.1.8",
+    "prettier": "^1.14.2",
+    "solium": "^1.1.8",
+    "truffle": "^4.1.14",
     "truffle-hdwallet-provider": "0.0.5"
   },
   "scripts": {
-    "test": "scripts/test.sh"
+    "test": "scripts/test.sh",
+    "lint": "npx solium -d contracts",
+    "lint:fix": "npx solium -d contracts --fix"
   },
   "author": "Christian Hentschel",
   "license": "ISC",
   "dependencies": {
     "erc821": "2.0.0",
-    "openzeppelin-solidity": "^1.9.0"
+    "openzeppelin-solidity": "^1.12.0"
   }
 }

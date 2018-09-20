@@ -2,14 +2,13 @@
   "extends": "solium:all",
   "plugins": ["security"],
   "rules": {
+    "security/no-block-members": "off",
+    "uppercase": "off",
     "quotes": ["error", "double"],
-    "no-empty-blocks": "off",
+    "max-len": ["warning", 100],
     "indentation": ["error", 2],
-    "max-len": ["warning", 79],
     "no-constant": ["error"],
     "security/enforce-explicit-visibility": ["error"],
-    "security/no-block-members": ["warning"],
     "security/no-inline-assembly": ["warning"]
   }
 }
-
