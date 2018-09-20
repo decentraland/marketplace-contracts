@@ -397,7 +397,7 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
     })
 
     it('should fail on execute a created order :: (unverifiable NFT registry)', async function() {
-      await market.createOrder(assetId, erc721.address, itemPrice, endTime, {
+      await market.createOrder(erc721.address, assetId, itemPrice, endTime, {
         from: seller
       })
 
@@ -410,8 +410,8 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
 
     it('should fail execute a created order :: (expired)', async function() {
       await market.createOrder(
-        assetId,
         verifiableErc721.address,
+        assetId,
         itemPrice,
         endTime,
         { from: seller }
@@ -485,7 +485,7 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
       let publicationFee = web3.toWei(0.5, 'ether')
 
       await market.setPublicationFee(publicationFee, { from: owner })
-      await market.createOrder(assetId, erc721.address, itemPrice, endTime, {
+      await market.createOrder(erc721.address, assetId, itemPrice, endTime, {
         from: seller
       })
 
@@ -505,7 +505,7 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
       let ownerCut = 10
 
       await market.setOwnerCut(ownerCut, { from: owner })
-      await market.createOrder(assetId, erc721.address, itemPrice, endTime, {
+      await market.createOrder(erc721.address, assetId, itemPrice, endTime, {
         from: seller
       })
       await market.executeOrder(erc721.address, assetId, itemPrice, {
