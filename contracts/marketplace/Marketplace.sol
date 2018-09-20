@@ -122,14 +122,14 @@ contract Marketplace is Ownable, Pausable, Destructible {
 
   /**
     * @dev Cancel an already published order
-    * @param assetId - ID of the published NFT
     * @param nftAddress - Non fungible registry address
+    * @param assetId - ID of the published NFT
     * @param priceInWei - Price in Wei for the supported coin
     * @param expiresAt - Duration of the order (in hours)
     */
   function createOrder(
-    uint256 assetId,
     address nftAddress,
+    uint256 assetId,
     uint256 priceInWei,
     uint256 expiresAt
   )
