@@ -174,8 +174,8 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
       await erc721.mint(otherAddress, newAssetId)
 
       await market
-        .createOrder(erc721.address, assetId, itemPrice, endTime, {
-          from: otherAddress
+        .createOrder(erc721.address, newAssetId, itemPrice, endTime, {
+          from: seller
         })
         .should.be.rejectedWith(EVMRevert)
     })
