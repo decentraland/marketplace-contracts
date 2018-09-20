@@ -1,0 +1,7 @@
+{
+  "name": "marketplace",
+  "version": "0.1.0",
+  "contracts": {
+    "Marketplace": "Marketplace"
+  }
+}

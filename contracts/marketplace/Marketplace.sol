@@ -1,10 +1,10 @@
 pragma solidity ^0.4.24;
 
-import "openzeppelin-solidity/contracts/ownership/Ownable.sol";
-import "openzeppelin-solidity/contracts/lifecycle/Pausable.sol";
-import "openzeppelin-solidity/contracts/lifecycle/Destructible.sol";
-import "openzeppelin-solidity/contracts/math/SafeMath.sol";
-import "openzeppelin-solidity/contracts/AddressUtils.sol";
+import "openzeppelin-zos/contracts/ownership/Ownable.sol";
+import "openzeppelin-zos/contracts/lifecycle/Pausable.sol";
+import "openzeppelin-zos/contracts/math/SafeMath.sol";
+import "openzeppelin-zos/contracts/AddressUtils.sol";
+import "zos-lib/contracts/migrations/Migratable.sol";
 
 
 /**
@@ -33,7 +33,7 @@ contract ERC721Verifiable is ERC721Interface {
 }
 
 
-contract Marketplace is Ownable, Pausable, Destructible {
+contract Marketplace is Migratable, Ownable, Pausable {
   using SafeMath for uint256;
   using AddressUtils for address;
 
@@ -90,10 +90,12 @@ contract Marketplace is Ownable, Pausable, Destructible {
   event ChangedOwnerCut(uint256 ownerCut);
 
   /**
-    * @dev Constructor for this contract
+    * @dev Initialize this contract. Acts as a constructor
     * @param _acceptedToken - Address of the ERC20 accepted for this marketplace
     */
-  constructor(address _acceptedToken) public {
+  function initialize(address _acceptedToken) public isInitializer("Marketplace", "0.0.1") {
+    Pausable.initialize(msg.sender); // Calls ownable behind the scenes...sigh
+
     acceptedToken = ERC20Interface(_acceptedToken);
   }
 
@@ -232,7 +234,7 @@ contract Marketplace is Ownable, Pausable, Destructible {
 
     require(
       verifiableNftRegistry.supportsInterface(InterfaceId_ValidateFingerprint),
-      'NFT registry does not support creating fingerprints'
+      "NFT registry does not support creating fingerprints"
     );
     require(
       verifiableNftRegistry.verifyFingerprint(assetId, fingerprint),

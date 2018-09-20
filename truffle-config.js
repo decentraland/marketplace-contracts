@@ -17,6 +17,12 @@ const ropstenProvider = process.env.SOLIDITY_COVERAGE
 
 module.exports = {
   networks: {
+    local: {
+      host: 'localhost',
+      port: 9545,
+      gas: 6721975,
+      network_id: '*' // eslint-disable-line camelcase
+    },
     development: {
       host: 'localhost',
       port: 8545,

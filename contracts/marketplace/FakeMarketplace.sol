@@ -4,7 +4,7 @@ import "./Marketplace.sol";
 
 
 contract FakeMarketplace is Marketplace {
-  constructor(address _acceptedToken) public
-  Marketplace(_acceptedToken)
-  { }
+  constructor(address _acceptedToken) public {
+    Marketplace.initialize(_acceptedToken);
+  }
 }
