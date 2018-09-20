@@ -310,7 +310,7 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
         .should.be.rejectedWith(EVMRevert)
     })
 
-    it.only('should fail on execute a created order :: (double execute)', async function() {
+    it('should fail on execute a created order :: (double execute)', async function() {
       await market.createOrder(erc721.address, assetId, itemPrice, endTime, {
         from: seller
       })
