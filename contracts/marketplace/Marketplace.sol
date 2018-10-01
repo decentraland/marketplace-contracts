@@ -115,7 +115,7 @@ contract Marketplace is Migratable, Ownable, Pausable {
     * @param ownerCut - Share amount, from 0 to 100
     */
   function setOwnerCut(uint8 ownerCut) public onlyOwner {
-    require(ownerCut < 100, "The owner cut should be between 0 to 100");
+    require(ownerCut < 100, "The owner cut should be between 0 and 100");
 
     ownerCutPercentage = ownerCut;
 
@@ -123,7 +123,7 @@ contract Marketplace is Migratable, Ownable, Pausable {
   }
 
   /**
-    * @dev Cancel an already published order
+    * @dev Creates a new order
     * @param nftAddress - Non fungible registry address
     * @param assetId - ID of the published NFT
     * @param priceInWei - Price in Wei for the supported coin
@@ -215,7 +215,7 @@ contract Marketplace is Migratable, Ownable, Pausable {
   }
 
   /**
-    * @dev Executes the sale for a published NTF and checks for the asset fingerprint
+    * @dev Executes the sale for a published NFT and checks for the asset fingerprint
     * @param nftAddress - Address of the NFT registry
     * @param assetId - ID of the published NFT
     * @param price - Order price
@@ -245,7 +245,7 @@ contract Marketplace is Migratable, Ownable, Pausable {
   }
 
   /**
-    * @dev Executes the sale for a published NTF
+    * @dev Executes the sale for a published NFT
     * @param nftAddress - Address of the NFT registry
     * @param assetId - ID of the published NFT
     * @param price - Order price
@@ -262,7 +262,7 @@ contract Marketplace is Migratable, Ownable, Pausable {
   }
 
   /**
-    * @dev Executes the sale for a published NTF
+    * @dev Executes the sale for a published NFT
     * @param nftAddress - Address of the NFT registry
     * @param assetId - ID of the published NFT
     * @param price - Order price
