@@ -454,7 +454,7 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
     it('should change owner sale cut', async function() {
       let ownerCut = 10
 
-      await market.setOwnerCut(ownerCut, { from: owner })
+      await market.setOwnerCutPercentage(ownerCut, { from: owner })
       let r = await market.ownerCutPercentage()
       r.should.be.bignumber.equal(ownerCut)
     })
@@ -463,7 +463,7 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
       let ownerCut = 200
 
       await market
-        .setOwnerCut(ownerCut, { from: owner })
+        .setOwnerCutPercentage(ownerCut, { from: owner })
         .should.be.rejectedWith(EVMRevert)
     })
 
@@ -471,7 +471,7 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
       let ownerCut = 10
 
       await market
-        .setOwnerCut(ownerCut, { from: seller })
+        .setOwnerCutPercentage(ownerCut, { from: seller })
         .should.be.rejectedWith(EVMRevert)
     })
   })
@@ -504,7 +504,7 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
 
       let ownerCut = 10
 
-      await market.setOwnerCut(ownerCut, { from: owner })
+      await market.setOwnerCutPercentage(ownerCut, { from: owner })
       await market.createOrder(erc721.address, assetId, itemPrice, endTime, {
         from: seller
       })
