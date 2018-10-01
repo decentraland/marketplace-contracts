@@ -3,7 +3,7 @@ pragma solidity ^0.4.23;
 import "openzeppelin-zos/contracts/token/ERC721/ERC721Token.sol";
 
 
-contract FakeERC721 is ERC721Token {
+contract ERC721Test is ERC721Token {
   constructor(string name, string symbol) public {
     ERC721Token.initialize(name, symbol);
   }

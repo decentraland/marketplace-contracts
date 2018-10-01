@@ -8,10 +8,10 @@ require('chai')
 const EVMThrow = 'invalid opcode'
 const EVMRevert = 'VM Exception while processing transaction: revert'
 
-const ERC20Token = artifacts.require('FakeERC20')
-const ERC721Token = artifacts.require('FakeERC721')
-const VerfiableERC721Token = artifacts.require('FakeVerifiableERC721')
-const Marketplace = artifacts.require('FakeMarketplace')
+const ERC20Token = artifacts.require('ERC20Test')
+const ERC721Token = artifacts.require('ERC721Test')
+const VerfiableERC721Token = artifacts.require('VerifiableERC721Test')
+const Marketplace = artifacts.require('MarketplaceTest')
 
 const { increaseTime, duration } = require('./helpers/increaseTime')
 
