@@ -318,7 +318,7 @@ contract Marketplace is Ownable, Pausable, Destructible {
     }
 
     /**
-     * @dev Executes the sale for a published NTF
+     * @dev Executes the sale for a published NFT
      * @param assetId - ID of the published NFT
      */
     function executeOrder(uint256 assetId, uint256 price) public whenNotPaused {

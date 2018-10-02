@@ -1,11 +1,11 @@
 pragma solidity ^0.4.23;
 
-import "./FakeERC721.sol";
+import "./ERC721Test.sol";
 
 
-contract FakeVerifiableERC721 is FakeERC721 {
+contract VerifiableERC721Test is ERC721Test {
   constructor(string name, string symbol) public
-  FakeERC721(name, symbol) {}
+  ERC721Test(name, symbol) {}
 
   function verifyFingerprint(uint256 assetId, bytes fingerprint) public pure returns (bool) {
     return getFingerprint(assetId) == _bytesToBytes32(fingerprint);
