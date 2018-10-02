@@ -109,6 +109,19 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
     endTime = getEndTime()
   })
 
+  describe('Initialize', function() {
+    it('should initialize with token', async function() {
+      let _market = await Marketplace.new(erc20.address, { from: owner})
+      let t = await _market.acceptedToken.call();
+
+      t.should.be.equal(erc20.address)
+    })
+
+    it('should revert if token does not exist', async function() {
+      await Marketplace.new(0, { from: owner}).should.be.rejectedWith(EVMRevert)
+    })
+  })
+
   describe('Create', function() {
     it('should create a new order', async function() {
       const { logs } = await market.createOrder(
