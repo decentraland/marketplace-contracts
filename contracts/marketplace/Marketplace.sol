@@ -114,7 +114,7 @@ contract Marketplace is Migratable, Ownable, Pausable {
     *  charged to the seller on a successful sale
     * @param ownerCut - Share amount, from 0 to 100
     */
-  function setOwnerCut(uint8 ownerCut) public onlyOwner {
+  function setOwnerCut(uint256 ownerCut) public onlyOwner {
     require(ownerCut < 100, "The owner cut should be between 0 and 100");
 
     ownerCutPercentage = ownerCut;
