@@ -87,7 +87,7 @@ contract Marketplace is Migratable, Ownable, Pausable {
   );
 
   event ChangedPublicationFee(uint256 publicationFee);
-  event ChangedOwnerCut(uint256 ownerCut);
+  event ChangedOwnerCutPercentage(uint256 ownerCutPercentage);
 
   /**
     * @dev Initialize this contract. Acts as a constructor
@@ -112,14 +112,14 @@ contract Marketplace is Migratable, Ownable, Pausable {
   /**
     * @dev Sets the share cut for the owner of the contract that's
     *  charged to the seller on a successful sale
-    * @param ownerCut - Share amount, from 0 to 100
+    * @param _ownerCutPercentage - Share amount, from 0 to 100
     */
-  function setOwnerCut(uint256 ownerCut) public onlyOwner {
-    require(ownerCut < 100, "The owner cut should be between 0 and 100");
+  function setOwnerCutPercentage(uint256 _ownerCutPercentage) public onlyOwner {
+    require(_ownerCutPercentage < 100, "The owner cut should be between 0 and 100");
 
-    ownerCutPercentage = ownerCut;
+    ownerCutPercentage = _ownerCutPercentage;
 
-    emit ChangedOwnerCut(ownerCutPercentage);
+    emit ChangedOwnerCutPercentage(ownerCutPercentage);
   }
 
   /**
