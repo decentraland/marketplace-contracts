@@ -54,6 +54,11 @@ function checkOrderSuccessfulLog(
   log.args.buyer.should.be.equal(buyer, 'buyer')
 }
 
+function checkChangedPublicationFeeLog(log, publicationFee) {
+  log.event.should.be.eq('ChangedPublicationFee')
+  log.args.publicationFee.should.be.bignumber.equal(publicationFee, 'publicationFee')
+}
+
 function getEndTime(minutesAhead = 15) {
   return web3.eth.getBlock('latest').timestamp + duration.minutes(minutesAhead)
 }
@@ -451,9 +456,11 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
     it('should change publication Fee', async function() {
       let publicationFee = web3.toWei(0.005, 'ether')
 
-      await market.setPublicationFee(publicationFee, { from: owner })
+      let { logs } = await market.setPublicationFee(publicationFee, { from: owner })
       let r = await market.publicationFeeInWei()
       r.should.be.bignumber.equal(publicationFee)
+      logs.length.should.be.equal(1)
+      checkChangedPublicationFeeLog(logs[0], publicationFee)
     })
 
     it('should fail to change publication Fee (not owner)', async function() {
