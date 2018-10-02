@@ -23,7 +23,6 @@
   "author": "Christian Hentschel",
   "license": "ISC",
   "dependencies": {
-    "erc821": "2.0.0",
     "openzeppelin-zos": "^1.9.4",
     "zos": "^1.4.2",
     "zos-lib": "^1.4.1"
