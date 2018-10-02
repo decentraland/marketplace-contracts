@@ -59,6 +59,11 @@ function checkChangedPublicationFeeLog(log, publicationFee) {
   log.args.publicationFee.should.be.bignumber.equal(publicationFee, 'publicationFee')
 }
 
+function checkChangedOwnerCutPercentageLog(log, ownerCutPercentage) {
+  log.event.should.be.eq('ChangedOwnerCutPercentage')
+  log.args.ownerCutPercentage.should.be.bignumber.equal(ownerCutPercentage, 'ownerCutPercentage')
+}
+
 function getEndTime(minutesAhead = 15) {
   return web3.eth.getBlock('latest').timestamp + duration.minutes(minutesAhead)
 }
@@ -477,9 +482,11 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
     it('should change owner sale cut', async function() {
       let ownerCut = 10
 
-      await market.setOwnerCutPercentage(ownerCut, { from: owner })
+      let { logs } = await market.setOwnerCutPercentage(ownerCut, { from: owner })
       let r = await market.ownerCutPercentage()
       r.should.be.bignumber.equal(ownerCut)
+      logs.length.should.be.equal(1)
+      checkChangedOwnerCutPercentageLog(logs[0], ownerCut)
     })
 
     it('should fail to change owner cut (% invalid above)', async function() {
