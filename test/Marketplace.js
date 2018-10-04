@@ -17,43 +17,62 @@ const LegacyERC721 = artifacts.require('LegacyERC721')
 
 const { increaseTime, duration } = require('./helpers/increaseTime')
 
-function checkOrderCreatedLog(
-  log,
+function checkOrderCreatedLogs(
+  logs,
   assetId,
   seller,
   nftAddress,
   priceInWei,
   expiresAt
 ) {
-  log.event.should.be.eq('OrderCreated')
-  log.args.assetId.should.be.bignumber.equal(assetId, 'assetId')
-  log.args.seller.should.be.equal(seller, 'seller')
-  log.args.nftAddress.should.be.equal(nftAddress, 'nftAddress')
-  log.args.priceInWei.should.be.bignumber.equal(priceInWei, 'priceInWei')
-  log.args.expiresAt.should.be.bignumber.equal(expiresAt, 'expiresAt')
+  logs.forEach((log, index) => {
+    if (index === 0) {
+      log.event.should.be.eq('OrderCreated')
+      log.args.nftAddress.should.be.equal(nftAddress, 'nftAddress')
+    } else {
+      log.event.should.be.eq('AuctionCreated')
+    }
+    log.args.assetId.should.be.bignumber.equal(assetId, 'assetId')
+    log.args.seller.should.be.equal(seller, 'seller')
+    log.args.priceInWei.should.be.bignumber.equal(priceInWei, 'priceInWei')
+    log.args.expiresAt.should.be.bignumber.equal(expiresAt, 'expiresAt')
+  })
 }
 
-function checkOrderCancelledLog(log, assetId, seller, nftAddress) {
-  log.event.should.be.eq('OrderCancelled')
-  log.args.assetId.should.be.bignumber.equal(assetId, 'assetId')
-  log.args.seller.should.be.equal(seller, 'seller')
-  log.args.nftAddress.should.be.equal(nftAddress, 'nftAddress')
+function checkOrderCancelledLogs(logs, assetId, seller, nftAddress) {
+  logs.forEach((log, index) => {
+    if (index === 0) {
+      log.event.should.be.eq('OrderCancelled')
+      log.args.nftAddress.should.be.equal(nftAddress, 'nftAddress')
+    } else {
+      log.event.should.be.eq('AuctionCancelled')
+    }
+    log.args.assetId.should.be.bignumber.equal(assetId, 'assetId')
+    log.args.seller.should.be.equal(seller, 'seller')
+  })
 }
 
-function checkOrderSuccessfulLog(
-  log,
+function checkOrderSuccessfulLogs(
+  logs,
   assetId,
   seller,
   nftAddress,
   totalPrice,
   buyer
 ) {
-  log.event.should.be.eq('OrderSuccessful')
-  log.args.assetId.should.be.bignumber.equal(assetId, 'assetId')
-  log.args.seller.should.be.equal(seller, 'seller')
-  log.args.nftAddress.should.be.equal(nftAddress, 'nftAddress')
-  log.args.totalPrice.should.be.bignumber.equal(totalPrice, 'totalPrice')
-  log.args.buyer.should.be.equal(buyer, 'buyer')
+  logs.forEach((log, index) => {
+    if (index === 0) {
+      log.event.should.be.eq('OrderSuccessful')
+      log.args.nftAddress.should.be.equal(nftAddress, 'nftAddress')
+      log.args.buyer.should.be.equal(buyer, 'buyer')
+    } else {
+      log.event.should.be.eq('AuctionSuccessful')
+      log.args.winner.should.be.equal(buyer, 'buyer')
+    }
+    log.args.assetId.should.be.bignumber.equal(assetId, 'assetId')
+    log.args.seller.should.be.equal(seller, 'seller')
+    log.args.totalPrice.should.be.bignumber.equal(totalPrice, 'totalPrice')
+  })
 }
 
 function checkChangedPublicationFeeLog(log, publicationFee) {
@@ -254,10 +273,9 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
         { from: seller }
       )
 
-      // Event emitted
       logs.length.should.be.equal(1)
-      checkOrderCreatedLog(
-        logs[0],
+      checkOrderCreatedLogs(
+        logs,
         assetId,
         seller,
         erc721.address,
@@ -285,10 +303,9 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
         { from: seller }
       )
 
-      // Event emitted
       logs.length.should.be.equal(1)
-      checkOrderCreatedLog(
-        logs[0],
+      checkOrderCreatedLogs(
+        logs,
         assetId,
         seller,
         erc721.address,
@@ -366,9 +383,9 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
       })
 
       // Event emitted
-      logs.length.should.be.equal(1)
-      checkOrderCreatedLog(
-        logs[0],
+      logs.length.should.be.equal(2)
+      checkOrderCreatedLogs(
+        logs,
         assetId,
         seller,
         legacyErc721.address,
@@ -399,9 +416,8 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
         from: seller
       })
 
-      // Event emitted
       logs.length.should.be.equal(1)
-      checkOrderCancelledLog(logs[0], assetId, seller, erc721.address)
+      checkOrderCancelledLogs(logs, assetId, seller, erc721.address)
     })
 
     it('should let the contract owner cancel a created order', async function() {
@@ -412,9 +428,8 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
         from: owner
       })
 
-      // Event emitted
       logs.length.should.be.equal(1)
-      checkOrderCancelledLog(logs[0], assetId, seller, erc721.address)
+      checkOrderCancelledLogs(logs, assetId, seller, erc721.address)
     })
 
     it('should fail canceling an order :: (wrong user)', async function() {
@@ -453,8 +468,8 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
       const { logs } = await cancelOrderLegacy(assetId, { from: seller })
 
       // Event emitted
-      logs.length.should.be.equal(1)
-      checkOrderCancelledLog(logs[0], assetId, seller, legacyErc721.address)
+      logs.length.should.be.equal(2)
+      checkOrderCancelledLogs(logs, assetId, seller, legacyErc721.address)
     })
 
     it('[LEGACY] should let the seller cancel a created legacy order', async function() {
@@ -462,8 +477,8 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
       const { logs } = await cancelOrderLegacy(assetId, { from: seller })
 
       // Event emitted
-      logs.length.should.be.equal(1)
-      checkOrderCancelledLog(logs[0], assetId, seller, legacyErc721.address)
+      logs.length.should.be.equal(2)
+      checkOrderCancelledLogs(logs, assetId, seller, legacyErc721.address)
     })
 
     it('[LEGACY] should not let the seller of a not legacy token to cancel a created order', async function() {
@@ -485,10 +500,9 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
         from: buyer
       })
 
-      // Event emitted
       logs.length.should.be.equal(1)
-      checkOrderSuccessfulLog(
-        logs[0],
+      checkOrderSuccessfulLogs(
+        logs,
         assetId,
         seller,
         erc721.address,
@@ -551,9 +565,9 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
       })
 
       // Event emitted
-      logs.length.should.be.equal(1)
-      checkOrderSuccessfulLog(
-        logs[0],
+      logs.length.should.be.equal(2)
+      checkOrderSuccessfulLogs(
+        logs,
         assetId,
         seller,
         legacyErc721.address,
@@ -569,9 +583,9 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
       })
 
       // Event emitted
-      logs.length.should.be.equal(1)
-      checkOrderSuccessfulLog(
-        logs[0],
+      logs.length.should.be.equal(2)
+      checkOrderSuccessfulLogs(
+        logs,
         assetId,
         seller,
         legacyErc721.address,
@@ -608,10 +622,9 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
         { from: buyer }
       )
 
-      // Event emitted
       logs.length.should.be.equal(1)
-      checkOrderSuccessfulLog(
-        logs[0],
+      checkOrderSuccessfulLogs(
+        logs,
         assetId,
         seller,
         verifiableErc721.address,
