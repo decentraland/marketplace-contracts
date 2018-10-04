@@ -264,6 +264,13 @@ contract Marketplace is Migratable, Ownable, Pausable, MarketplaceStorage {
       priceInWei,
       expiresAt
     );
+    emit AuctionCreated(
+      orderId,
+      assetId,
+      assetOwner,
+      priceInWei,
+      expiresAt
+    );
   }
 
   /**
@@ -288,6 +295,11 @@ contract Marketplace is Migratable, Ownable, Pausable, MarketplaceStorage {
       assetId,
       orderSeller,
       orderNftAddress
+    );
+    emit AuctionCancelled(
+      orderId,
+      assetId,
+      orderSeller
     );
   }
 
@@ -362,6 +374,13 @@ contract Marketplace is Migratable, Ownable, Pausable, MarketplaceStorage {
       assetId,
       seller,
       nftAddress,
+      price,
+      msg.sender
+    );
+    emit AuctionSuccessful(
+      orderId,
+      assetId,
+      seller,
       price,
       msg.sender
     );
