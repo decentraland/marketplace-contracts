@@ -230,7 +230,12 @@ contract Marketplace is Migratable, Ownable, Pausable {
    public
    whenNotPaused
   {
-    _executeOrder(nftAddress, assetId, price, fingerprint);
+    _executeOrder(
+      nftAddress,
+      assetId,
+      price,
+      fingerprint
+    );
   }
 
   /**
@@ -247,7 +252,12 @@ contract Marketplace is Migratable, Ownable, Pausable {
    public
    whenNotPaused
   {
-    _executeOrder(nftAddress, assetId, price, '');
+    _executeOrder(
+      nftAddress,
+      assetId,
+      price,
+      ""
+    );
   }
 
   /**
