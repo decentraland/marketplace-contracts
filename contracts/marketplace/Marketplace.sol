@@ -272,6 +272,16 @@ contract Marketplace is Migratable, Ownable, Pausable {
   }
 
   /**
+    * @dev [LEGACY] Gets an order using the legacy NFT address.
+    * @dev It's equivalent to orderByAssetId[legacyNFTAddress][assetId] but returns same structure as the old Auction
+    * @param assetId - ID of the published NFT
+    */
+  function auctionByAssetId(uint256 assetId) public view returns (bytes32, address, uint256, uint256) {
+    Order memory order = orderByAssetId[legacyNFTAddress][assetId];
+    return (order.id, order.seller, order.price, order.expiresAt);
+  }
+
+  /**
     * @dev Creates a new order
     * @param nftAddress - Non fungible registry address
     * @param assetId - ID of the published NFT
