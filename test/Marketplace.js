@@ -96,7 +96,7 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
     return callMethod('executeOrder', 'uint256,uint256', params)
   }
   async function cancelOrderLegacy(...params) {
-    return callMethod('cancelOrder', 'address,uint256', params)
+    return callMethod('cancelOrder', 'uint256', params)
   }
 
   // Makeshift method to support solidity overloads ( https://github.com/trufflesuite/truffle/issues/737 ):
@@ -206,6 +206,29 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
       s[4].should.be.bignumber.equal(endTime)
     })
 
+    it('[LEGACY] should create a new order', async function() {
+      const { logs } = await createOrderLegacy(assetId, itemPrice, endTime, {
+        from: seller
+      })
+
+      // Event emitted
+      logs.length.should.be.equal(1)
+      checkOrderCreatedLog(
+        logs[0],
+        assetId,
+        seller,
+        legacyErc721.address,
+        itemPrice,
+        endTime
+      )
+
+      // Check data
+      let s = await market.auctionByAssetId(assetId)
+      s[1].should.be.equal(seller)
+      s[2].should.be.bignumber.equal(itemPrice)
+      s[3].should.be.bignumber.equal(endTime)
+    })
+
     it('should update an order', async function() {
       let newPrice = web3.toWei(2.0, 'ether')
       let newEndTime = endTime + duration.minutes(5)
@@ -273,6 +296,15 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
       checkOrderCancelledLog(logs[0], assetId, seller, erc721.address)
     })
 
+    it('[LEGACY] should let the seller cancel a created order', async function() {
+      await createOrderLegacy(assetId, itemPrice, endTime, { from: seller })
+      const { logs } = await cancelOrderLegacy(assetId, { from: seller })
+
+      // Event emitted
+      logs.length.should.be.equal(1)
+      checkOrderCancelledLog(logs[0], assetId, seller, legacyErc721.address)
+    })
+
     it('should let the contract owner cancel a created order', async function() {
       await createOrder(erc721.address, assetId, itemPrice, endTime, {
         from: seller
@@ -332,6 +364,24 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
         assetId,
         seller,
         erc721.address,
+        itemPrice,
+        buyer
+      )
+    })
+
+    it('[LEGACY] should execute a created order', async function() {
+      await createOrderLegacy(assetId, itemPrice, endTime, { from: seller })
+      const { logs } = await executeOrderLegacy(assetId, itemPrice, {
+        from: buyer
+      })
+
+      // Event emitted
+      logs.length.should.be.equal(1)
+      checkOrderSuccessfulLog(
+        logs[0],
+        assetId,
+        seller,
+        legacyErc721.address,
         itemPrice,
         buyer
       )
