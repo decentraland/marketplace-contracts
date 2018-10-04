@@ -289,6 +289,9 @@ contract Marketplace is Migratable, Ownable, Pausable {
 
     uint saleShareAmount = 0;
 
+    bytes32 orderId = order.id;
+    delete orderByAssetId[nftAddress][assetId];
+
     if (ownerCutPercentage > 0) {
       // Calculate sale share
       saleShareAmount = price.mul(ownerCutPercentage).div(100);
@@ -314,9 +317,6 @@ contract Marketplace is Migratable, Ownable, Pausable {
       msg.sender,
       assetId
     );
-
-    bytes32 orderId = order.id;
-    delete orderByAssetId[nftAddress][assetId];
 
     emit OrderSuccessful(
       orderId,
