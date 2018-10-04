@@ -45,7 +45,7 @@ contract Marketplace is Migratable, Ownable, Pausable {
     // Owner of the NFT
     address seller;
     // NFT registry address
-    address nftAddress;
+    address darAddress;
     // Price (in wei) for the published item
     uint256 price;
     // Time when this sale ends
@@ -58,16 +58,25 @@ contract Marketplace is Migratable, Ownable, Pausable {
   uint256 public ownerCutPercentage;
   uint256 public publicationFeeInWei;
 
+  mapping (address => bool) public allowedDAR;
+
   bytes4 public constant InterfaceId_ValidateFingerprint = bytes4(
     keccak256("verifyFingerprint(uint256,bytes)")
   );
+  bytes4 public constant InterfaceId_ERC721 = bytes4(0x80ac58cd);
 
   /* EVENTS */
+  event AllowedDAR(
+    address darAddress
+  );
+  event DisallowedDAR(
+    address darAddress
+  );
   event OrderCreated(
     bytes32 id,
     uint256 indexed assetId,
     address indexed seller,
-    address nftAddress,
+    address darAddress,
     uint256 priceInWei,
     uint256 expiresAt
   );
@@ -75,7 +84,7 @@ contract Marketplace is Migratable, Ownable, Pausable {
     bytes32 id,
     uint256 indexed assetId,
     address indexed seller,
-    address nftAddress,
+    address darAddress,
     uint256 totalPrice,
     address indexed winner
   );
@@ -83,7 +92,7 @@ contract Marketplace is Migratable, Ownable, Pausable {
     bytes32 id,
     uint256 indexed assetId,
     address indexed seller,
-    address nftAddress
+    address darAddress
   );
 
   event ChangedPublicationFee(uint256 publicationFee);
@@ -123,14 +132,42 @@ contract Marketplace is Migratable, Ownable, Pausable {
   }
 
   /**
+    * @dev Allows a token to be traded in the marketplace
+    * @param darAddress - Digital Asset Registry (NFT Contract) address to allow
+    */
+  function allowDAR(address darAddress) public onlyOwner {
+    require(darAddress.isContract(), "The DAR should be a contract");
+    ERC721Interface dar = ERC721Interface(darAddress);
+    require(
+      dar.supportsInterface(InterfaceId_ERC721),
+      "The DAR does not seem to be a standard ERC721"
+    );
+    allowedDAR[darAddress] = true;
+
+    emit AllowedDAR(darAddress);
+  }
+
+  /**
+    * @dev Disallows a token from being traded in the marketplace
+    * @param darAddress - Digital Asset Registry (NFT Contract) address to allow
+    */
+  function disallowDAR(address darAddress) public onlyOwner {
+    require(allowedDAR[darAddress], "DAR not allowed");
+
+    allowedDAR[darAddress] = false;
+
+    emit DisallowedDAR(darAddress);
+  }
+
+  /**
     * @dev Creates a new order
-    * @param nftAddress - Non fungible registry address
+    * @param darAddress - Digital Asset Registry (NFT Contract) address
     * @param assetId - ID of the published NFT
     * @param priceInWei - Price in Wei for the supported coin
     * @param expiresAt - Duration of the order (in hours)
     */
   function createOrder(
-    address nftAddress,
+    address darAddress,
     uint256 assetId,
     uint256 priceInWei,
     uint256 expiresAt
@@ -138,14 +175,14 @@ contract Marketplace is Migratable, Ownable, Pausable {
     public
     whenNotPaused
   {
-    require(nftAddress.isContract(), "The NFT Address should be a contract");
+    require(allowedDAR[darAddress], "The DAR must be whitelisted");
 
-    ERC721Interface nftRegistry = ERC721Interface(nftAddress);
-    address assetOwner = nftRegistry.ownerOf(assetId);
+    ERC721Interface dar = ERC721Interface(darAddress);
+    address assetOwner = dar.ownerOf(assetId);
 
     require(msg.sender == assetOwner, "Only the owner can create orders");
     require(
-      nftRegistry.getApproved(assetId) == address(this) || nftRegistry.isApprovedForAll(assetOwner, address(this)),
+      dar.getApproved(assetId) == address(this) || dar.isApprovedForAll(assetOwner, address(this)),
       "The contract is not authorized to manage the asset"
     );
     require(priceInWei > 0, "Price should be bigger than 0");
@@ -156,15 +193,15 @@ contract Marketplace is Migratable, Ownable, Pausable {
         block.timestamp,
         assetOwner,
         assetId,
-        nftAddress,
+        darAddress,
         priceInWei
       )
     );
 
-    orderByAssetId[nftAddress][assetId] = Order({
+    orderByAssetId[darAddress][assetId] = Order({
       id: orderId,
       seller: assetOwner,
-      nftAddress: nftAddress,
+      darAddress: darAddress,
       price: priceInWei,
       expiresAt: expiresAt
     });
@@ -183,7 +220,7 @@ contract Marketplace is Migratable, Ownable, Pausable {
       orderId,
       assetId,
       assetOwner,
-      nftAddress,
+      darAddress,
       priceInWei,
       expiresAt
     );
@@ -192,19 +229,19 @@ contract Marketplace is Migratable, Ownable, Pausable {
   /**
     * @dev Cancel an already published order
     *  can only be canceled by seller or the contract owner
-    * @param nftAddress - Address of the NFT registry
+    * @param darAddress - Address of the NFT registry
     * @param assetId - ID of the published NFT
     */
-  function cancelOrder(address nftAddress, uint256 assetId) public whenNotPaused {
-    Order memory order = orderByAssetId[nftAddress][assetId];
+  function cancelOrder(address darAddress, uint256 assetId) public whenNotPaused {
+    Order memory order = orderByAssetId[darAddress][assetId];
 
     require(order.id != 0, "Asset not published");
     require(order.seller == msg.sender || msg.sender == owner, "Unauthorized user");
 
     bytes32 orderId = order.id;
     address orderSeller = order.seller;
-    address orderNftAddress = order.nftAddress;
-    delete orderByAssetId[nftAddress][assetId];
+    address orderNftAddress = order.darAddress;
+    delete orderByAssetId[darAddress][assetId];
 
     emit OrderCancelled(
       orderId,
@@ -216,13 +253,13 @@ contract Marketplace is Migratable, Ownable, Pausable {
 
   /**
     * @dev Executes the sale for a published NFT and checks for the asset fingerprint
-    * @param nftAddress - Address of the NFT registry
+    * @param darAddress - Address of the NFT registry
     * @param assetId - ID of the published NFT
     * @param price - Order price
     * @param fingerprint - Verification info for the asset
     */
   function safeExecuteOrder(
-    address nftAddress,
+    address darAddress,
     uint256 assetId,
     uint256 price,
     bytes fingerprint
@@ -231,7 +268,7 @@ contract Marketplace is Migratable, Ownable, Pausable {
    whenNotPaused
   {
     _executeOrder(
-      nftAddress,
+      darAddress,
       assetId,
       price,
       fingerprint
@@ -240,12 +277,12 @@ contract Marketplace is Migratable, Ownable, Pausable {
 
   /**
     * @dev Executes the sale for a published NFT
-    * @param nftAddress - Address of the NFT registry
+    * @param darAddress - Address of the NFT registry
     * @param assetId - ID of the published NFT
     * @param price - Order price
     */
   function executeOrder(
-    address nftAddress,
+    address darAddress,
     uint256 assetId,
     uint256 price
   )
@@ -253,7 +290,7 @@ contract Marketplace is Migratable, Ownable, Pausable {
    whenNotPaused
   {
     _executeOrder(
-      nftAddress,
+      darAddress,
       assetId,
       price,
       ""
@@ -262,28 +299,28 @@ contract Marketplace is Migratable, Ownable, Pausable {
 
   /**
     * @dev Executes the sale for a published NFT
-    * @param nftAddress - Address of the NFT registry
+    * @param darAddress - Address of the NFT registry
     * @param assetId - ID of the published NFT
     * @param price - Order price
     * @param fingerprint - Verification info for the asset
     */
   function _executeOrder(
-    address nftAddress,
+    address darAddress,
     uint256 assetId,
     uint256 price,
     bytes fingerprint
   )
    internal
   {
-    ERC721Verifiable nftRegistry = ERC721Verifiable(nftAddress);
+    ERC721Verifiable dar = ERC721Verifiable(darAddress);
 
-    if (nftRegistry.supportsInterface(InterfaceId_ValidateFingerprint)) {
+    if (dar.supportsInterface(InterfaceId_ValidateFingerprint)) {
       require(
-        nftRegistry.verifyFingerprint(assetId, fingerprint),
+        dar.verifyFingerprint(assetId, fingerprint),
         "The asset fingerprint is not valid"
       );
     }
-    Order memory order = orderByAssetId[nftAddress][assetId];
+    Order memory order = orderByAssetId[darAddress][assetId];
 
     require(order.id != 0, "Asset not published");
 
@@ -293,12 +330,12 @@ contract Marketplace is Migratable, Ownable, Pausable {
     require(seller != msg.sender, "Unauthorized user");
     require(order.price == price, "The price is not correct");
     require(block.timestamp < order.expiresAt, "The order expired");
-    require(seller == nftRegistry.ownerOf(assetId), "The seller is no longer the owner");
+    require(seller == dar.ownerOf(assetId), "The seller is no longer the owner");
 
     uint saleShareAmount = 0;
 
     bytes32 orderId = order.id;
-    delete orderByAssetId[nftAddress][assetId];
+    delete orderByAssetId[darAddress][assetId];
 
     if (ownerCutPercentage > 0) {
       // Calculate sale share
@@ -320,7 +357,7 @@ contract Marketplace is Migratable, Ownable, Pausable {
     );
 
     // Transfer asset owner
-    nftRegistry.safeTransferFrom(
+    dar.safeTransferFrom(
       seller,
       msg.sender,
       assetId
@@ -330,7 +367,7 @@ contract Marketplace is Migratable, Ownable, Pausable {
       orderId,
       assetId,
       seller,
-      nftAddress,
+      darAddress,
       price,
       msg.sender
     );

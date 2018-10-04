@@ -19,37 +19,37 @@ function checkOrderCreatedLog(
   log,
   assetId,
   seller,
-  nftAddress,
+  darAddress,
   priceInWei,
   expiresAt
 ) {
   log.event.should.be.eq('OrderCreated')
   log.args.assetId.should.be.bignumber.equal(assetId, 'assetId')
   log.args.seller.should.be.equal(seller, 'seller')
-  log.args.nftAddress.should.be.equal(nftAddress, 'nftAddress')
+  log.args.darAddress.should.be.equal(darAddress, 'darAddress')
   log.args.priceInWei.should.be.bignumber.equal(priceInWei, 'priceInWei')
   log.args.expiresAt.should.be.bignumber.equal(expiresAt, 'expiresAt')
 }
 
-function checkOrderCancelledLog(log, assetId, seller, nftAddress) {
+function checkOrderCancelledLog(log, assetId, seller, darAddress) {
   log.event.should.be.eq('OrderCancelled')
   log.args.assetId.should.be.bignumber.equal(assetId, 'assetId')
   log.args.seller.should.be.equal(seller, 'seller')
-  log.args.nftAddress.should.be.equal(nftAddress, 'nftAddress')
+  log.args.darAddress.should.be.equal(darAddress, 'darAddress')
 }
 
 function checkOrderSuccessfulLog(
   log,
   assetId,
   seller,
-  nftAddress,
+  darAddress,
   totalPrice,
   winner
 ) {
   log.event.should.be.eq('OrderSuccessful')
   log.args.assetId.should.be.bignumber.equal(assetId, 'assetId')
   log.args.seller.should.be.equal(seller, 'seller')
-  log.args.nftAddress.should.be.equal(nftAddress, 'nftAddress')
+  log.args.darAddress.should.be.equal(darAddress, 'darAddress')
   log.args.totalPrice.should.be.bignumber.equal(totalPrice, 'totalPrice')
   log.args.winner.should.be.equal(winner, 'winner')
 }
@@ -87,6 +87,8 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
 
     // Create a Marketplace with mocks
     market = await Marketplace.new(erc20.address, { from: owner })
+    market.allowDAR(erc721.address, { from: owner });
+    market.allowDAR(verifiableErc721.address, { from: owner });
 
     // Set holder of the asset and aproved on registry
     await erc721.mint(seller, assetId)
