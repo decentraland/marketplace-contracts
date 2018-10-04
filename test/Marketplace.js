@@ -10,10 +10,11 @@ const abiDecoder = require('abi-decoder')
 const EVMThrow = 'invalid opcode'
 const EVMRevert = 'VM Exception while processing transaction: revert'
 
+const Marketplace = artifacts.require('MarketplaceTest')
 const ERC20Token = artifacts.require('ERC20Test')
 const ERC721Token = artifacts.require('ERC721Test')
 const VerfiableERC721Token = artifacts.require('VerifiableERC721Test')
-const Marketplace = artifacts.require('MarketplaceTest')
+const LegacyERC721 = artifacts.require('LegacyERC721')
 
 const { increaseTime, duration } = require('./helpers/increaseTime')
 
@@ -68,6 +69,7 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
   let erc20
   let erc721
   let verifiableErc721
+  let legacyErc721
 
   let endTime
 
@@ -142,9 +144,12 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
       'DCL',
       creationParams
     )
+    legacyErc721 = await LegacyERC721.new('OLDLAND', 'OLDDCL', creationParams)
 
     // Create a Marketplace with mocks
-    market = await Marketplace.new(erc20.address, '', { from: owner })
+    market = await Marketplace.new(erc20.address, legacyErc721.address, {
+      from: owner
+    })
 
     // Set holder of the asset and aproved on registry
     await erc721.mint(seller, assetId)
@@ -158,6 +163,9 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
     await verifiableErc721.setApprovalForAll(market.address, true, {
       from: buyer
     })
+
+    await legacyErc721.mint(seller, assetId)
+    await legacyErc721.setApprovalForAll(market.address, true, { from: seller })
 
     // Assign balance to buyer and allow marketplace to move ERC20
     await erc20.setBalance(buyer, web3.toWei(10, 'ether'))
@@ -553,6 +561,23 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
 
       let buyerBalance = await erc20.balanceOf(buyer)
       buyerBalance.should.be.bignumber.equal(web3.toWei(9.0, 'ether'))
+    })
+  })
+
+  describe('Legacy auctionByAssetId', function() {
+    it('should return the order of a published nft with the old Auction structure', async function() {
+      await createOrderLegacy(assetId, itemPrice, endTime, { from: seller })
+
+      const [
+        _,
+        orderSeller,
+        orderPrice,
+        orderExpiresAt
+      ] = await market.auctionByAssetId(assetId)
+
+      orderSeller.should.be.equal(seller, 'seller')
+      orderPrice.should.be.bignumber.equal(itemPrice, 'itemPrice')
+      orderExpiresAt.should.be.bignumber.equal(endTime, 'expiresAt')
     })
   })
 })
