@@ -230,18 +230,12 @@ contract Marketplace is Migratable, Ownable, Pausable {
    public
    whenNotPaused
   {
-    ERC721Verifiable verifiableNftRegistry = ERC721Verifiable(nftAddress);
-
-    require(
-      verifiableNftRegistry.supportsInterface(InterfaceId_ValidateFingerprint),
-      "NFT registry does not support creating fingerprints"
+    _executeOrder(
+      nftAddress,
+      assetId,
+      price,
+      fingerprint
     );
-    require(
-      verifiableNftRegistry.verifyFingerprint(assetId, fingerprint),
-      "The asset fingerprint is not valid"
-    );
-
-    _executeOrder(nftAddress, assetId, price);
   }
 
   /**
@@ -258,7 +252,12 @@ contract Marketplace is Migratable, Ownable, Pausable {
    public
    whenNotPaused
   {
-    _executeOrder(nftAddress, assetId, price);
+    _executeOrder(
+      nftAddress,
+      assetId,
+      price,
+      ""
+    );
   }
 
   /**
@@ -266,20 +265,29 @@ contract Marketplace is Migratable, Ownable, Pausable {
     * @param nftAddress - Address of the NFT registry
     * @param assetId - ID of the published NFT
     * @param price - Order price
+    * @param fingerprint - Verification info for the asset
     */
   function _executeOrder(
     address nftAddress,
     uint256 assetId,
-    uint256 price
+    uint256 price,
+    bytes fingerprint
   )
    internal
   {
+    ERC721Verifiable nftRegistry = ERC721Verifiable(nftAddress);
+
+    if (nftRegistry.supportsInterface(InterfaceId_ValidateFingerprint)) {
+      require(
+        nftRegistry.verifyFingerprint(assetId, fingerprint),
+        "The asset fingerprint is not valid"
+      );
+    }
     Order memory order = orderByAssetId[nftAddress][assetId];
 
     require(order.id != 0, "Asset not published");
 
     address seller = order.seller;
-    ERC721Interface nftRegistry = ERC721Interface(nftAddress);
 
     require(seller != address(0), "Invalid address");
     require(seller != msg.sender, "Unauthorized user");

@@ -396,13 +396,16 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
         .should.be.rejectedWith(EVMRevert)
     })
 
-    it('should fail on execute a created order :: (unverifiable NFT registry)', async function() {
-      await market.createOrder(erc721.address, assetId, itemPrice, endTime, {
-        from: seller
-      })
-
+    it('should fail on unsafe executeOrder :: (verifiable NFT registry)', async function() {
+      await market.createOrder(
+        verifiableErc721.address,
+        assetId,
+        itemPrice,
+        endTime,
+        { from: seller }
+      )
       await market
-        .safeExecuteOrder(erc721.address, assetId, itemPrice, fingerprint, {
+        .executeOrder(verifiableErc721.address, assetId, itemPrice, {
           from: buyer
         })
         .should.be.rejectedWith(EVMRevert)
