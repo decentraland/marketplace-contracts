@@ -5,6 +5,8 @@ require('chai')
   .use(require('chai-bignumber')(BigNumber))
   .should()
 
+const abiDecoder = require('abi-decoder')
+
 const EVMThrow = 'invalid opcode'
 const EVMRevert = 'VM Exception while processing transaction: revert'
 
@@ -85,6 +87,62 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
     gasPrice: 21e9
   }
 
+  async function createOrder(...params) {
+    return callMethod('createOrder', 'address,uint256,uint256,uint256', params)
+  }
+  async function executeOrder(...params) {
+    return callMethod('executeOrder', 'address,uint256,uint256', params)
+  }
+  async function cancelOrder(...params) {
+    return callMethod('cancelOrder', 'address,uint256', params)
+  }
+
+  async function createOrderLegacy(...params) {
+    return callMethod('createOrder', 'uint256,uint256,uint256', params)
+  }
+  async function executeOrderLegacy(...params) {
+    return callMethod('executeOrder', 'uint256,uint256', params)
+  }
+  async function cancelOrderLegacy(...params) {
+    return callMethod('cancelOrder', 'address,uint256', params)
+  }
+
+  // Makeshift method to support solidity overloads ( https://github.com/trufflesuite/truffle/issues/737 ):
+  // Truffle does not support overloads correctly. The only way to call them is using the form:
+  //  instance.contract.method[args](params)
+  // but that doesn't return the same result as calling the same method with:
+  //  instance.method(params)
+  // To remedy this, we had to decode the logs ourselves and mimic the structure returned in the receipt logs
+  async function callMethod(methodName, argTypes, params) {
+    const lastParam = params[params.length - 1]
+
+    if (typeof lastParam === 'object') {
+      lastParam.gas = lastParam.gas || 6e6
+      lastParam.gasPrice = lastParam.gasPrice || 21e9
+    } else {
+      params.push({ gas: 6e6, gasPrice: 21e9 })
+    }
+
+    const txHash = await market.contract[methodName][argTypes](...params)
+    const receipt = await new Promise((resolve, reject) =>
+      web3.eth.getTransactionReceipt(
+        txHash,
+        (err, data) => (err ? reject(err) : resolve(data))
+      )
+    )
+
+    const decodedLogs = abiDecoder.decodeLogs(receipt.logs)
+    receipt.logs = decodedLogs.filter(log => !!log).map(log => ({
+      event: log.name,
+      args: log.events.reduce(
+        (args, arg) => ({ ...args, [arg.name]: arg.value }),
+        {}
+      )
+    }))
+
+    return receipt
+  }
+
   beforeEach(async function() {
     // Create tokens
     erc20 = await ERC20Token.new(creationParams)
@@ -96,7 +154,7 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
     )
 
     // Create a Marketplace with mocks
-    market = await Marketplace.new(erc20.address, { from: owner })
+    market = await Marketplace.new(erc20.address, '', { from: owner })
 
     // Set holder of the asset and aproved on registry
     await erc721.mint(seller, assetId)
@@ -118,6 +176,8 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
     await erc20.approve(market.address, 1e30, { from: buyer })
 
     endTime = getEndTime()
+
+    abiDecoder.addABI(market.abi)
   })
 
   describe('Initialize', function() {
@@ -135,7 +195,7 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
 
   describe('Create', function() {
     it('should create a new order', async function() {
-      const { logs } = await market.createOrder(
+      const { logs } = await createOrder(
         erc721.address,
         assetId,
         itemPrice,
@@ -166,7 +226,7 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
       let newPrice = web3.toWei(2.0, 'ether')
       let newEndTime = endTime + duration.minutes(5)
 
-      const { logs } = await market.createOrder(
+      const { logs } = await createOrder(
         erc721.address,
         assetId,
         newPrice,
@@ -197,27 +257,21 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
       const newAssetId = 123123123
       await erc721.mint(otherAddress, newAssetId)
 
-      await market
-        .createOrder(erc721.address, newAssetId, itemPrice, endTime, {
-          from: seller
-        })
-        .should.be.rejectedWith(EVMRevert)
+      await createOrder(erc721.address, newAssetId, itemPrice, endTime, {
+        from: seller
+      }).should.be.rejectedWith(EVMRevert)
     })
 
     it('should fail to create an order :: (address not the owner of asset)', async function() {
-      await market
-        .createOrder(erc721.address, assetId, itemPrice, endTime, {
-          from: otherAddress
-        })
-        .should.be.rejectedWith(EVMRevert)
+      await createOrder(erc721.address, assetId, itemPrice, endTime, {
+        from: otherAddress
+      }).should.be.rejectedWith(EVMRevert)
     })
 
     it('should fail to create an order :: (not an ERC721 contract)', async function() {
-      await market
-        .createOrder(erc20.address, assetId, itemPrice, endTime, {
-          from: seller
-        })
-        .should.be.rejectedWith(EVMRevert)
+      await createOrder(erc20.address, assetId, itemPrice, endTime, {
+        from: seller
+      }).should.be.rejectedWith(EVMRevert)
     })
 
     it('should fail to create an order :: (price is 0)', async function() {
@@ -247,10 +301,10 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
 
   describe('Cancel', function() {
     it('should let the seller cancel a created order', async function() {
-      await market.createOrder(erc721.address, assetId, itemPrice, endTime, {
+      await createOrder(erc721.address, assetId, itemPrice, endTime, {
         from: seller
       })
-      const { logs } = await market.cancelOrder(erc721.address, assetId, {
+      const { logs } = await cancelOrder(erc721.address, assetId, {
         from: seller
       })
 
@@ -260,10 +314,10 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
     })
 
     it('should let the contract owner cancel a created order', async function() {
-      await market.createOrder(erc721.address, assetId, itemPrice, endTime, {
+      await createOrder(erc721.address, assetId, itemPrice, endTime, {
         from: seller
       })
-      const { logs } = await market.cancelOrder(erc721.address, assetId, {
+      const { logs } = await cancelOrder(erc721.address, assetId, {
         from: owner
       })
 
@@ -273,46 +327,43 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
     })
 
     it('should fail canceling an order :: (wrong user)', async function() {
-      await market.createOrder(erc721.address, assetId, itemPrice, endTime, {
+      await createOrder(erc721.address, assetId, itemPrice, endTime, {
         from: seller
       })
-      await market
-        .cancelOrder(erc721.address, assetId, { from: buyer })
-        .should.be.rejectedWith(EVMRevert)
+      await cancelOrder(erc721.address, assetId, {
+        from: buyer
+      }).should.be.rejectedWith(EVMRevert)
     })
 
     it('should fail canceling an order :: (wrong NFT address)', async function() {
-      await market.createOrder(erc721.address, assetId, itemPrice, endTime, {
+      await createOrder(erc721.address, assetId, itemPrice, endTime, {
         from: seller
       })
-      await market
-        .cancelOrder(erc20.address, assetId, { from: seller })
-        .should.be.rejectedWith(EVMRevert)
+      await cancelOrder(erc20.address, assetId, {
+        from: seller
+      }).should.be.rejectedWith(EVMRevert)
     })
 
     it('should fail canceling an order :: (double cancel)', async function() {
-      await market.createOrder(erc721.address, assetId, itemPrice, endTime, {
+      await createOrder(erc721.address, assetId, itemPrice, endTime, {
         from: seller
       })
-      await market.cancelOrder(erc721.address, assetId, { from: seller })
+      await cancelOrder(erc721.address, assetId, { from: seller })
 
-      await market
-        .cancelOrder(erc721.address, assetId, { from: seller })
-        .should.be.rejectedWith(EVMRevert)
+      await cancelOrder(erc721.address, assetId, {
+        from: seller
+      }).should.be.rejectedWith(EVMRevert)
     })
   })
 
   describe('Execute', function() {
     it('should execute a created order', async function() {
-      await market.createOrder(erc721.address, assetId, itemPrice, endTime, {
+      await createOrder(erc721.address, assetId, itemPrice, endTime, {
         from: seller
       })
-      const { logs } = await market.executeOrder(
-        erc721.address,
-        assetId,
-        itemPrice,
-        { from: buyer }
-      )
+      const { logs } = await executeOrder(erc721.address, assetId, itemPrice, {
+        from: buyer
+      })
 
       // Event emitted
       logs.length.should.be.equal(1)
@@ -327,48 +378,48 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
     })
 
     it('should fail on execute a created order :: (wrong user)', async function() {
-      await market.createOrder(erc721.address, assetId, itemPrice, endTime, {
+      await createOrder(erc721.address, assetId, itemPrice, endTime, {
         from: seller
       })
 
-      await market
-        .executeOrder(erc721.address, assetId, itemPrice, { from: seller })
-        .should.be.rejectedWith(EVMRevert)
+      await executeOrder(erc721.address, assetId, itemPrice, {
+        from: seller
+      }).should.be.rejectedWith(EVMRevert)
     })
 
     it('should fail on execute a created order :: (wrong NFT address)', async function() {
-      await market.createOrder(erc721.address, assetId, itemPrice, endTime, {
+      await createOrder(erc721.address, assetId, itemPrice, endTime, {
         from: seller
       })
 
-      await market
-        .executeOrder(erc20.address, assetId, itemPrice, { from: buyer })
-        .should.be.rejectedWith(EVMRevert)
+      await executeOrder(erc20.address, assetId, itemPrice, {
+        from: buyer
+      }).should.be.rejectedWith(EVMRevert)
     })
 
     it('should fail execute a created order :: (expired)', async function() {
-      await market.createOrder(erc721.address, assetId, itemPrice, endTime, {
+      await createOrder(erc721.address, assetId, itemPrice, endTime, {
         from: seller
       })
 
       // move an hour ahead
       await increaseTime(3600)
-      await market
-        .executeOrder(erc721.address, assetId, itemPrice, { from: buyer })
-        .should.be.rejectedWith(EVMRevert)
+      await executeOrder(erc721.address, assetId, itemPrice, {
+        from: buyer
+      }).should.be.rejectedWith(EVMRevert)
     })
 
     it('should fail on execute a created order :: (double execute)', async function() {
-      await market.createOrder(erc721.address, assetId, itemPrice, endTime, {
+      await createOrder(erc721.address, assetId, itemPrice, endTime, {
         from: seller
       })
-      await market.executeOrder(erc721.address, assetId, itemPrice, {
+      await executeOrder(erc721.address, assetId, itemPrice, {
         from: buyer
       })
 
-      await market
-        .executeOrder(erc721.address, assetId, itemPrice, { from: buyer })
-        .should.be.rejectedWith(EVMRevert)
+      await executeOrder(erc721.address, assetId, itemPrice, {
+        from: buyer
+      }).should.be.rejectedWith(EVMRevert)
     })
   })
 
@@ -379,15 +430,9 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
     })
 
     it('should verify and execute a created order', async function() {
-      await market.createOrder(
-        verifiableErc721.address,
-        assetId,
-        itemPrice,
-        endTime,
-        {
-          from: seller
-        }
-      )
+      await createOrder(verifiableErc721.address, assetId, itemPrice, endTime, {
+        from: seller
+      })
       const { logs } = await market.safeExecuteOrder(
         verifiableErc721.address,
         assetId,
@@ -409,13 +454,9 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
     })
 
     it('should fail on execute a created order :: (wrong fingerprint)', async function() {
-      await market.createOrder(
-        verifiableErc721.address,
-        assetId,
-        itemPrice,
-        endTime,
-        { from: seller }
-      )
+      await createOrder(verifiableErc721.address, assetId, itemPrice, endTime, {
+        from: seller
+      })
 
       await market
         .safeExecuteOrder(verifiableErc721.address, assetId, itemPrice, '-1', {
@@ -425,13 +466,9 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
     })
 
     it('should fail on execute a created order :: (wrong user)', async function() {
-      await market.createOrder(
-        verifiableErc721.address,
-        assetId,
-        itemPrice,
-        endTime,
-        { from: seller }
-      )
+      await createOrder(verifiableErc721.address, assetId, itemPrice, endTime, {
+        from: seller
+      })
 
       await market
         .safeExecuteOrder(
@@ -445,13 +482,9 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
     })
 
     it('should fail on unsafe executeOrder :: (verifiable NFT registry)', async function() {
-      await market.createOrder(
-        verifiableErc721.address,
-        assetId,
-        itemPrice,
-        endTime,
-        { from: seller }
-      )
+      await createOrder(verifiableErc721.address, assetId, itemPrice, endTime, {
+        from: seller
+      })
       await market
         .executeOrder(verifiableErc721.address, assetId, itemPrice, {
           from: buyer
@@ -460,13 +493,9 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
     })
 
     it('should fail execute a created order :: (expired)', async function() {
-      await market.createOrder(
-        verifiableErc721.address,
-        assetId,
-        itemPrice,
-        endTime,
-        { from: seller }
-      )
+      await createOrder(verifiableErc721.address, assetId, itemPrice, endTime, {
+        from: seller
+      })
 
       // move an hour ahead
       await increaseTime(3600)
@@ -540,7 +569,7 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
       let publicationFee = web3.toWei(0.5, 'ether')
 
       await market.setPublicationFee(publicationFee, { from: owner })
-      await market.createOrder(erc721.address, assetId, itemPrice, endTime, {
+      await createOrder(erc721.address, assetId, itemPrice, endTime, {
         from: seller
       })
 
@@ -560,10 +589,10 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
       let ownerCut = 10
 
       await market.setOwnerCutPercentage(ownerCut, { from: owner })
-      await market.createOrder(erc721.address, assetId, itemPrice, endTime, {
+      await createOrder(erc721.address, assetId, itemPrice, endTime, {
         from: seller
       })
-      await market.executeOrder(erc721.address, assetId, itemPrice, {
+      await executeOrder(erc721.address, assetId, itemPrice, {
         from: buyer
       })
 
