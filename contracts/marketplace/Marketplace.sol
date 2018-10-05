@@ -96,11 +96,8 @@ contract Marketplace is Migratable, Ownable, Pausable {
   function initialize(address _acceptedToken) public isInitializer("Marketplace", "0.0.1") {
     Pausable.initialize(msg.sender); // Calls ownable behind the scenes...sigh
 
-    uint size;
-    assembly { size := extcodesize(_acceptedToken) }
-
     // this check will fail when calling from the construction of the erc20 token
-    require(size > 0, "Address must be a deployed contract");
+    require(_acceptedToken.isContract(), "Address must be a deployed contract");
     acceptedToken = ERC20Interface(_acceptedToken);
   }
 
