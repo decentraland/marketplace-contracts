@@ -172,10 +172,9 @@ contract Marketplace is Migratable, Ownable, Pausable {
     // Check if there's a publication fee and
     // transfer the amount to marketplace owner
     if (publicationFeeInWei > 0) {
-      acceptedToken.transferFrom(
-        msg.sender,
-        owner,
-        publicationFeeInWei
+      require(
+        acceptedToken.transferFrom(msg.sender, owner, publicationFeeInWei),
+        "Transfering the publication fee to the Marketplace owner failed"
       );
     }
 
@@ -305,18 +304,16 @@ contract Marketplace is Migratable, Ownable, Pausable {
       saleShareAmount = price.mul(ownerCutPercentage).div(100);
 
       // Transfer share amount for marketplace Owner
-      acceptedToken.transferFrom(
-        msg.sender,
-        owner,
-        saleShareAmount
+      require(
+        acceptedToken.transferFrom(msg.sender, owner, saleShareAmount),
+        "Transfering the cut to the Marketplace owner failed"
       );
     }
 
     // Transfer sale amount to seller
-    acceptedToken.transferFrom(
-      msg.sender,
-      seller,
-      price.sub(saleShareAmount)
+    require(
+      acceptedToken.transferFrom(msg.sender, seller, price.sub(saleShareAmount)),
+      "Transfering the sale amount to the seller failed"
     );
 
     // Transfer asset owner
