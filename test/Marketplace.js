@@ -44,14 +44,14 @@ function checkOrderSuccessfulLog(
   seller,
   nftAddress,
   totalPrice,
-  winner
+  buyer
 ) {
   log.event.should.be.eq('OrderSuccessful')
   log.args.assetId.should.be.bignumber.equal(assetId, 'assetId')
   log.args.seller.should.be.equal(seller, 'seller')
   log.args.nftAddress.should.be.equal(nftAddress, 'nftAddress')
   log.args.totalPrice.should.be.bignumber.equal(totalPrice, 'totalPrice')
-  log.args.winner.should.be.equal(winner, 'winner')
+  log.args.buyer.should.be.equal(buyer, 'buyer')
 }
 
 function getEndTime(minutesAhead = 15) {

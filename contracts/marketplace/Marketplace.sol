@@ -77,7 +77,7 @@ contract Marketplace is Migratable, Ownable, Pausable {
     address indexed seller,
     address nftAddress,
     uint256 totalPrice,
-    address indexed winner
+    address indexed buyer
   );
   event OrderCancelled(
     bytes32 id,
