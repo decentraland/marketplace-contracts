@@ -113,6 +113,7 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
 
     // Assign balance to buyer and allow marketplace to move ERC20
     await erc20.setBalance(buyer, web3.toWei(10, 'ether'))
+    await erc20.setBalance(seller, web3.toWei(10, 'ether'))
     await erc20.approve(market.address, 1e30, { from: seller })
     await erc20.approve(market.address, 1e30, { from: buyer })
 
@@ -217,6 +218,30 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
           from: seller
         })
         .should.be.rejectedWith(EVMRevert)
+    })
+
+    it('should fail to create an order :: (price is 0)', async function() {
+      await market.createOrder(erc721.address, assetId, 0, endTime, { from: seller })
+      .should.be.rejectedWith(EVMRevert)
+    })
+
+    it('should fail to create an order :: (expires too soon)', async function() {
+      const newTime = web3.eth.getBlock('latest').timestamp + duration.seconds(59);
+      await market.createOrder(erc721.address, assetId, itemPrice, newTime, { from: seller })
+      .should.be.rejectedWith(EVMRevert)
+    })
+
+    it('should fail to create an order :: (nft not approved)', async function() {
+      await erc721.setApprovalForAll(market.address, false, { from: seller })
+      await market.createOrder(erc721.address, assetId, itemPrice, endTime, { from: seller })
+      .should.be.rejectedWith(EVMRevert)
+    })
+
+    it('should fail to create an order :: (publication fee not paid)', async function() {
+      await erc20.approve(market.address, 1, { from: seller })
+      await market.setPublicationFee(2, { from: owner })
+      await market.createOrder(erc721.address, assetId, itemPrice, endTime, { from: seller })
+      .should.be.rejectedWith(EVMRevert)
     })
   })
 
