@@ -103,6 +103,15 @@ contract Marketplace is Migratable, Ownable, Pausable, MarketplaceStorage {
       priceInWei,
       expiresAt
     );
+
+    Order memory order = orderByAssetId[legacyNFTAddress][assetId];
+    emit AuctionCreated(
+      order.id,
+      assetId,
+      order.seller,
+      order.price,
+      order.expiresAt
+    );
   }
 
   /**
@@ -121,7 +130,13 @@ contract Marketplace is Migratable, Ownable, Pausable, MarketplaceStorage {
     * @param assetId - ID of the published NFT
     */
   function cancelOrder(uint256 assetId) public whenNotPaused {
-    _cancelOrder(legacyNFTAddress, assetId);
+    Order memory order = _cancelOrder(legacyNFTAddress, assetId);
+
+    emit AuctionCancelled(
+      order.id,
+      assetId,
+      order.seller
+    );
   }
 
   /**
@@ -182,11 +197,19 @@ contract Marketplace is Migratable, Ownable, Pausable, MarketplaceStorage {
    public
    whenNotPaused
   {
-    _executeOrder(
+    Order memory order = _executeOrder(
       legacyNFTAddress,
       assetId,
       price,
       ""
+    );
+    
+    emit AuctionSuccessful(
+      order.id,
+      assetId,
+      order.seller,
+      price,
+      msg.sender
     );
   }
 
@@ -264,13 +287,6 @@ contract Marketplace is Migratable, Ownable, Pausable, MarketplaceStorage {
       priceInWei,
       expiresAt
     );
-    emit AuctionCreated(
-      orderId,
-      assetId,
-      assetOwner,
-      priceInWei,
-      expiresAt
-    );
   }
 
   /**
@@ -279,7 +295,7 @@ contract Marketplace is Migratable, Ownable, Pausable, MarketplaceStorage {
     * @param nftAddress - Address of the NFT registry
     * @param assetId - ID of the published NFT
     */
-  function _cancelOrder(address nftAddress, uint256 assetId) internal {
+  function _cancelOrder(address nftAddress, uint256 assetId) internal returns (Order) {
     Order memory order = orderByAssetId[nftAddress][assetId];
 
     require(order.id != 0, "Asset not published");
@@ -296,11 +312,8 @@ contract Marketplace is Migratable, Ownable, Pausable, MarketplaceStorage {
       orderSeller,
       orderNftAddress
     );
-    emit AuctionCancelled(
-      orderId,
-      assetId,
-      orderSeller
-    );
+
+    return order;
   }
 
   /**
@@ -316,7 +329,7 @@ contract Marketplace is Migratable, Ownable, Pausable, MarketplaceStorage {
     uint256 price,
     bytes fingerprint
   )
-   internal
+   internal returns (Order)
   {
     ERC721Verifiable nftRegistry = ERC721Verifiable(nftAddress);
 
@@ -377,12 +390,7 @@ contract Marketplace is Migratable, Ownable, Pausable, MarketplaceStorage {
       price,
       msg.sender
     );
-    emit AuctionSuccessful(
-      orderId,
-      assetId,
-      seller,
-      price,
-      msg.sender
-    );
+
+    return order;
   }
 }

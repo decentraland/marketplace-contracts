@@ -7,7 +7,6 @@ require('chai')
 
 const abiDecoder = require('abi-decoder')
 
-const EVMThrow = 'invalid opcode'
 const EVMRevert = 'VM Exception while processing transaction: revert'
 
 const Marketplace = artifacts.require('MarketplaceTest')
@@ -205,8 +204,7 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
         { from: seller }
       )
 
-      // Events emitted (new and legacy)
-      logs.length.should.be.equal(2)
+      logs.length.should.be.equal(1)
       checkOrderCreatedLogs(
         logs,
         assetId,
@@ -259,8 +257,7 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
         { from: seller }
       )
 
-      // Events emitted (new and legacy)
-      logs.length.should.be.equal(2)
+      logs.length.should.be.equal(1)
       checkOrderCreatedLogs(
         logs,
         assetId,
@@ -309,8 +306,7 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
         from: seller
       })
 
-      // Events emitted (new and legacy)
-      logs.length.should.be.equal(2)
+      logs.length.should.be.equal(1)
       checkOrderCancelledLogs(logs, assetId, seller, erc721.address)
     })
 
@@ -331,8 +327,7 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
         from: owner
       })
 
-      // Events emitted (new and legacy)
-      logs.length.should.be.equal(2)
+      logs.length.should.be.equal(1)
       checkOrderCancelledLogs(logs, assetId, seller, erc721.address)
     })
 
@@ -375,8 +370,7 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
         from: buyer
       })
 
-      // Events emitted (new and legacy)
-      logs.length.should.be.equal(2)
+      logs.length.should.be.equal(1)
       checkOrderSuccessfulLogs(
         logs,
         assetId,
@@ -469,8 +463,7 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
         { from: buyer }
       )
 
-      // Events emitted (new and legacy)
-      logs.length.should.be.equal(2)
+      logs.length.should.be.equal(1)
       checkOrderSuccessfulLogs(
         logs,
         assetId,
