@@ -85,6 +85,7 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
   const itemPrice = web3.toWei(1.0, 'ether')
   const assetId = 10000
   const notLegacyAssetId = 2
+  const zeroAddress = '0x0000000000000000000000000000000000000000'
 
   let market
   let erc20
@@ -206,16 +207,40 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
 
   describe('Initialize', function() {
     it('should initialize with token', async function() {
-      let _market = await Marketplace.new(erc20.address, { from: owner })
+      let _market = await Marketplace.new(erc20.address, legacyErc721.address, {
+        from: owner
+      })
       let t = await _market.acceptedToken.call()
 
       t.should.be.equal(erc20.address)
     })
 
-    it('should revert if token does not exist', async function() {
-      await Marketplace.new(0, { from: owner }).should.be.rejectedWith(
-        EVMRevert
-      )
+    it('should revert if token is invalid', async function() {
+      await Marketplace.new(0, legacyErc721.address, {
+        from: owner
+      }).should.be.rejectedWith(EVMRevert)
+
+      await Marketplace.new(zeroAddress, legacyErc721.address, {
+        from: owner
+      }).should.be.rejectedWith(EVMRevert)
+
+      await Marketplace.new('0x1234', legacyErc721.address, {
+        from: owner
+      }).should.be.rejectedWith(EVMRevert)
+    })
+
+    it('should revert if nft address is invalid', async function() {
+      await Marketplace.new(erc20.address, 0, {
+        from: owner
+      }).should.be.rejectedWith(EVMRevert)
+
+      await Marketplace.new(erc20.address, zeroAddress, {
+        from: owner
+      }).should.be.rejectedWith(EVMRevert)
+
+      await Marketplace.new(erc20.address, '0x1234', {
+        from: owner
+      }).should.be.rejectedWith(EVMRevert)
     })
   })
 
@@ -801,7 +826,7 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
 
       // Check data
       let s = await market.auctionByAssetId(assetId)
-      s[1].should.be.equal('0x0000000000000000000000000000000000000000')
+      s[1].should.be.equal(zeroAddress)
       s[2].should.be.bignumber.equal(0)
       s[3].should.be.bignumber.equal(0)
     })
@@ -844,10 +869,7 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
         .should.be.rejectedWith(EVMRevert)
 
       await market
-        .setLegacyNFTAddress(
-          '0x0000000000000000000000000000000000000000',
-          fromOwner
-        )
+        .setLegacyNFTAddress(zeroAddress, fromOwner)
         .should.be.rejectedWith(EVMRevert)
 
       await market

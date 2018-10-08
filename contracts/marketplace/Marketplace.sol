@@ -144,7 +144,7 @@ contract Marketplace is Migratable, Ownable, Pausable {
     require(_acceptedToken.isContract(), "The accepted token address must be a deployed contract");
     acceptedToken = ERC20Interface(_acceptedToken);
 
-    require(_legacyNFTAddress.isContract(), "the legacy NFT address should be a deployed contract");
+    require(_legacyNFTAddress.isContract(), "The legacy NFT address should be a deployed contract");
     legacyNFTAddress = _legacyNFTAddress;
   }
 
