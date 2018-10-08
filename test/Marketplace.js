@@ -7,7 +7,6 @@ require('chai')
 
 const abiDecoder = require('abi-decoder')
 
-const EVMThrow = 'invalid opcode'
 const EVMRevert = 'VM Exception while processing transaction: revert'
 
 const Marketplace = artifacts.require('MarketplaceTest')
@@ -57,6 +56,11 @@ function checkOrderSuccessfulLog(
   log.args.winner.should.be.equal(winner, 'winner')
 }
 
+function checkSetLegacyNFTAddressLog(log, nftAddress) {
+  log.event.should.be.eq('ChangeLegacyNFTAddress')
+  log.args.legacyNFTAddress.should.be.equal(nftAddress, 'nftAddress')
+}
+
 function getEndTime(minutesAhead = 15) {
   return web3.eth.getBlock('latest').timestamp + duration.minutes(minutesAhead)
 }
@@ -74,8 +78,12 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
 
   let endTime
 
+  const fromOwner = {
+    from: owner
+  }
+
   const creationParams = {
-    from: owner,
+    ...fromOwner,
     gas: 6e6,
     gasPrice: 21e9
   }
@@ -281,42 +289,6 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
       s[1].should.be.equal(seller)
       s[2].should.be.bignumber.equal(itemPrice)
       s[3].should.be.bignumber.equal(endTime)
-    })
-
-    it('[LEGACY] should get legacy token with order getter', async function() {
-      await createOrderLegacy(assetId, itemPrice, endTime, {
-        from: seller
-      })
-
-      let s = await market.orderByAssetId.call(legacyErc721.address, assetId)
-      s[1].should.be.equal(seller)
-      s[2].should.be.equal(legacyErc721.address)
-      s[3].should.be.bignumber.equal(itemPrice)
-      s[4].should.be.bignumber.equal(endTime)
-    })
-
-    it('[LEGACY] should get legacy token with order legacy getter', async function() {
-      await createOrder(legacyErc721.address, assetId, itemPrice, endTime, {
-        from: seller
-      })
-
-      // Check data
-      let s = await market.auctionByAssetId(assetId)
-      s[1].should.be.equal(seller)
-      s[2].should.be.bignumber.equal(itemPrice)
-      s[3].should.be.bignumber.equal(endTime)
-    })
-
-    it('[LEGACY] should not get not legacy token with order legacy getter', async function() {
-      await createOrder(erc721.address, assetId, itemPrice, endTime, {
-        from: seller
-      })
-
-      // Check data
-      let s = await market.auctionByAssetId(assetId)
-      s[1].should.be.equal('0x0000000000000000000000000000000000000000')
-      s[2].should.be.bignumber.equal(0)
-      s[3].should.be.bignumber.equal(0)
     })
 
     it('[LEGACY] should fail to create a new order with a not legacy token', async function() {
@@ -721,6 +693,94 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
       orderSeller.should.be.equal(seller, 'seller')
       orderPrice.should.be.bignumber.equal(itemPrice, 'itemPrice')
       orderExpiresAt.should.be.bignumber.equal(endTime, 'expiresAt')
+    })
+
+    it('should get legacy token with order getter', async function() {
+      await createOrderLegacy(assetId, itemPrice, endTime, {
+        from: seller
+      })
+
+      let s = await market.orderByAssetId.call(legacyErc721.address, assetId)
+      s[1].should.be.equal(seller)
+      s[2].should.be.equal(legacyErc721.address)
+      s[3].should.be.bignumber.equal(itemPrice)
+      s[4].should.be.bignumber.equal(endTime)
+    })
+
+    it('should get legacy token with order legacy getter', async function() {
+      await createOrder(legacyErc721.address, assetId, itemPrice, endTime, {
+        from: seller
+      })
+
+      // Check data
+      let s = await market.auctionByAssetId(assetId)
+      s[1].should.be.equal(seller)
+      s[2].should.be.bignumber.equal(itemPrice)
+      s[3].should.be.bignumber.equal(endTime)
+    })
+
+    it('should not get not legacy token with order legacy getter', async function() {
+      await createOrder(erc721.address, assetId, itemPrice, endTime, {
+        from: seller
+      })
+
+      // Check data
+      let s = await market.auctionByAssetId(assetId)
+      s[1].should.be.equal('0x0000000000000000000000000000000000000000')
+      s[2].should.be.bignumber.equal(0)
+      s[3].should.be.bignumber.equal(0)
+    })
+  })
+
+  describe('setLegacyNFTAddress', function() {
+    it('should return the legacy nft address', async function() {
+      const address = await market.legacyNFTAddress()
+      address.should.be.equal(legacyErc721.address)
+    })
+
+    it('should change the legacy nft address', async function() {
+      let address = await market.legacyNFTAddress()
+      address.should.be.equal(legacyErc721.address)
+
+      const { logs } = await market.setLegacyNFTAddress(
+        erc721.address,
+        fromOwner
+      )
+
+      // Event emitted
+      logs.length.should.be.equal(1)
+      checkSetLegacyNFTAddressLog(logs[0], erc721.address)
+      address = await market.legacyNFTAddress()
+      address.should.be.equal(erc721.address)
+    })
+
+    it('should rever if not the owner try to change the legacy nft address', async function() {
+      await market
+        .setLegacyNFTAddress(erc721.address)
+        .should.be.rejectedWith(EVMRevert)
+    })
+
+    it('should revert when changing legacy nft address with an invalid contract address', async function() {
+      let address = await market.legacyNFTAddress()
+      address.should.be.equal(legacyErc721.address)
+
+      await market
+        .setLegacyNFTAddress(0, fromOwner)
+        .should.be.rejectedWith(EVMRevert)
+
+      await market
+        .setLegacyNFTAddress(
+          '0x0000000000000000000000000000000000000000',
+          fromOwner
+        )
+        .should.be.rejectedWith(EVMRevert)
+
+      await market
+        .setLegacyNFTAddress('0x123', fromOwner)
+        .should.be.rejectedWith(EVMRevert)
+
+      address = await market.legacyNFTAddress()
+      address.should.be.equal(legacyErc721.address)
     })
   })
 })

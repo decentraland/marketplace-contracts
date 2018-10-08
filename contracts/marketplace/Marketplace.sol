@@ -121,7 +121,6 @@ contract Marketplace is Migratable, Ownable, Pausable {
     */
   function setLegacyNFTAddress(address _legacyNFTAddress) external onlyOwner {
     require(_legacyNFTAddress.isContract(), "The address should be a contract");
-    require(_legacyNFTAddress != 0, "The address should be valid");
 
     legacyNFTAddress = _legacyNFTAddress;
     emit ChangeLegacyNFTAddress(legacyNFTAddress);
@@ -142,6 +141,8 @@ contract Marketplace is Migratable, Ownable, Pausable {
     Pausable.initialize(msg.sender); // Calls ownable behind the scenes...sigh
 
     acceptedToken = ERC20Interface(_acceptedToken);
+
+    require(_legacyNFTAddress.isContract(), "the legacy NFT address should be a deployed contract");
     legacyNFTAddress = _legacyNFTAddress;
   }
 
