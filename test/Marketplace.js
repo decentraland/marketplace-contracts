@@ -7,7 +7,6 @@ require('chai')
 
 const abiDecoder = require('abi-decoder')
 
-const EVMThrow = 'invalid opcode'
 const EVMRevert = 'VM Exception while processing transaction: revert'
 
 const Marketplace = artifacts.require('MarketplaceTest')
@@ -59,12 +58,23 @@ function checkOrderSuccessfulLog(
 
 function checkChangedPublicationFeeLog(log, publicationFee) {
   log.event.should.be.eq('ChangedPublicationFee')
-  log.args.publicationFee.should.be.bignumber.equal(publicationFee, 'publicationFee')
+  log.args.publicationFee.should.be.bignumber.equal(
+    publicationFee,
+    'publicationFee'
+  )
 }
 
 function checkChangedOwnerCutPercentageLog(log, ownerCutPercentage) {
   log.event.should.be.eq('ChangedOwnerCutPercentage')
-  log.args.ownerCutPercentage.should.be.bignumber.equal(ownerCutPercentage, 'ownerCutPercentage')
+  log.args.ownerCutPercentage.should.be.bignumber.equal(
+    ownerCutPercentage,
+    'ownerCutPercentage'
+  )
+}
+
+function checkSetLegacyNFTAddressLog(log, nftAddress) {
+  log.event.should.be.eq('ChangeLegacyNFTAddress')
+  log.args.legacyNFTAddress.should.be.equal(nftAddress, 'nftAddress')
 }
 
 function getEndTime(minutesAhead = 15) {
@@ -74,6 +84,7 @@ function getEndTime(minutesAhead = 15) {
 contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
   const itemPrice = web3.toWei(1.0, 'ether')
   const assetId = 10000
+  const notLegacyAssetId = 2
 
   let market
   let erc20
@@ -83,8 +94,12 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
 
   let endTime
 
+  const fromOwner = {
+    from: owner
+  }
+
   const creationParams = {
-    from: owner,
+    ...fromOwner,
     gas: 6e6,
     gasPrice: 21e9
   }
@@ -167,6 +182,7 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
     await erc721.setApprovalForAll(market.address, true, { from: buyer })
 
     await verifiableErc721.mint(seller, assetId)
+    await verifiableErc721.mint(seller, notLegacyAssetId)
     await verifiableErc721.setApprovalForAll(market.address, true, {
       from: seller
     })
@@ -190,14 +206,16 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
 
   describe('Initialize', function() {
     it('should initialize with token', async function() {
-      let _market = await Marketplace.new(erc20.address, { from: owner})
-      let t = await _market.acceptedToken.call();
+      let _market = await Marketplace.new(erc20.address, { from: owner })
+      let t = await _market.acceptedToken.call()
 
       t.should.be.equal(erc20.address)
     })
 
     it('should revert if token does not exist', async function() {
-      await Marketplace.new(0, { from: owner}).should.be.rejectedWith(EVMRevert)
+      await Marketplace.new(0, { from: owner }).should.be.rejectedWith(
+        EVMRevert
+      )
     })
   })
 
@@ -228,29 +246,6 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
       s[2].should.be.equal(erc721.address)
       s[3].should.be.bignumber.equal(itemPrice)
       s[4].should.be.bignumber.equal(endTime)
-    })
-
-    it('[LEGACY] should create a new order', async function() {
-      const { logs } = await createOrderLegacy(assetId, itemPrice, endTime, {
-        from: seller
-      })
-
-      // Event emitted
-      logs.length.should.be.equal(1)
-      checkOrderCreatedLog(
-        logs[0],
-        assetId,
-        seller,
-        legacyErc721.address,
-        itemPrice,
-        endTime
-      )
-
-      // Check data
-      let s = await market.auctionByAssetId(assetId)
-      s[1].should.be.equal(seller)
-      s[2].should.be.bignumber.equal(itemPrice)
-      s[3].should.be.bignumber.equal(endTime)
     })
 
     it('should update an order', async function() {
@@ -306,27 +301,67 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
     })
 
     it('should fail to create an order :: (price is 0)', async function() {
-      await market.createOrder(erc721.address, assetId, 0, endTime, { from: seller })
-      .should.be.rejectedWith(EVMRevert)
+      await market
+        .createOrder(erc721.address, assetId, 0, endTime, { from: seller })
+        .should.be.rejectedWith(EVMRevert)
     })
 
     it('should fail to create an order :: (expires too soon)', async function() {
-      const newTime = web3.eth.getBlock('latest').timestamp + duration.seconds(59);
-      await market.createOrder(erc721.address, assetId, itemPrice, newTime, { from: seller })
-      .should.be.rejectedWith(EVMRevert)
+      const newTime =
+        web3.eth.getBlock('latest').timestamp + duration.seconds(59)
+      await market
+        .createOrder(erc721.address, assetId, itemPrice, newTime, {
+          from: seller
+        })
+        .should.be.rejectedWith(EVMRevert)
     })
 
     it('should fail to create an order :: (nft not approved)', async function() {
       await erc721.setApprovalForAll(market.address, false, { from: seller })
-      await market.createOrder(erc721.address, assetId, itemPrice, endTime, { from: seller })
-      .should.be.rejectedWith(EVMRevert)
+      await market
+        .createOrder(erc721.address, assetId, itemPrice, endTime, {
+          from: seller
+        })
+        .should.be.rejectedWith(EVMRevert)
     })
 
     it('should fail to create an order :: (publication fee not paid)', async function() {
       await erc20.approve(market.address, 1, { from: seller })
       await market.setPublicationFee(2, { from: owner })
-      await market.createOrder(erc721.address, assetId, itemPrice, endTime, { from: seller })
-      .should.be.rejectedWith(EVMRevert)
+      await market
+        .createOrder(erc721.address, assetId, itemPrice, endTime, {
+          from: seller
+        })
+        .should.be.rejectedWith(EVMRevert)
+    })
+
+    it('[LEGACY] should create a new order', async function() {
+      const { logs } = await createOrderLegacy(assetId, itemPrice, endTime, {
+        from: seller
+      })
+
+      // Event emitted
+      logs.length.should.be.equal(1)
+      checkOrderCreatedLog(
+        logs[0],
+        assetId,
+        seller,
+        legacyErc721.address,
+        itemPrice,
+        endTime
+      )
+
+      // Check data
+      let s = await market.auctionByAssetId(assetId)
+      s[1].should.be.equal(seller)
+      s[2].should.be.bignumber.equal(itemPrice)
+      s[3].should.be.bignumber.equal(endTime)
+    })
+
+    it('[LEGACY] should fail to create a new order with a not legacy token', async function() {
+      await createOrderLegacy(notLegacyAssetId, itemPrice, endTime, {
+        from: seller
+      }).should.be.rejectedWith(EVMRevert)
     })
   })
 
@@ -342,15 +377,6 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
       // Event emitted
       logs.length.should.be.equal(1)
       checkOrderCancelledLog(logs[0], assetId, seller, erc721.address)
-    })
-
-    it('[LEGACY] should let the seller cancel a created order', async function() {
-      await createOrderLegacy(assetId, itemPrice, endTime, { from: seller })
-      const { logs } = await cancelOrderLegacy(assetId, { from: seller })
-
-      // Event emitted
-      logs.length.should.be.equal(1)
-      checkOrderCancelledLog(logs[0], assetId, seller, legacyErc721.address)
     })
 
     it('should let the contract owner cancel a created order', async function() {
@@ -394,6 +420,35 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
         from: seller
       }).should.be.rejectedWith(EVMRevert)
     })
+
+    it('[LEGACY] should let the seller cancel a created order', async function() {
+      await createOrder(legacyErc721.address, assetId, itemPrice, endTime, {
+        from: seller
+      })
+      const { logs } = await cancelOrderLegacy(assetId, { from: seller })
+
+      // Event emitted
+      logs.length.should.be.equal(1)
+      checkOrderCancelledLog(logs[0], assetId, seller, legacyErc721.address)
+    })
+
+    it('[LEGACY] should let the seller cancel a created legacy order', async function() {
+      await createOrderLegacy(assetId, itemPrice, endTime, { from: seller })
+      const { logs } = await cancelOrderLegacy(assetId, { from: seller })
+
+      // Event emitted
+      logs.length.should.be.equal(1)
+      checkOrderCancelledLog(logs[0], assetId, seller, legacyErc721.address)
+    })
+
+    it('[LEGACY] should not let the seller of a not legacy token to cancel a created order', async function() {
+      await createOrder(erc721.address, assetId, itemPrice, endTime, {
+        from: seller
+      })
+      await cancelOrderLegacy(assetId, {
+        from: seller
+      }).should.be.rejectedWith(EVMRevert)
+    })
   })
 
   describe('Execute', function() {
@@ -412,24 +467,6 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
         assetId,
         seller,
         erc721.address,
-        itemPrice,
-        buyer
-      )
-    })
-
-    it('[LEGACY] should execute a created order', async function() {
-      await createOrderLegacy(assetId, itemPrice, endTime, { from: seller })
-      const { logs } = await executeOrderLegacy(assetId, itemPrice, {
-        from: buyer
-      })
-
-      // Event emitted
-      logs.length.should.be.equal(1)
-      checkOrderSuccessfulLog(
-        logs[0],
-        assetId,
-        seller,
-        legacyErc721.address,
         itemPrice,
         buyer
       )
@@ -476,6 +513,53 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
       })
 
       await executeOrder(erc721.address, assetId, itemPrice, {
+        from: buyer
+      }).should.be.rejectedWith(EVMRevert)
+    })
+
+    it('[LEGACY] should execute a created order', async function() {
+      await createOrder(legacyErc721.address, assetId, itemPrice, endTime, {
+        from: seller
+      })
+      const { logs } = await executeOrderLegacy(assetId, itemPrice, {
+        from: buyer
+      })
+
+      // Event emitted
+      logs.length.should.be.equal(1)
+      checkOrderSuccessfulLog(
+        logs[0],
+        assetId,
+        seller,
+        legacyErc721.address,
+        itemPrice,
+        buyer
+      )
+    })
+
+    it('[LEGACY] should execute a created legacy order', async function() {
+      await createOrderLegacy(assetId, itemPrice, endTime, { from: seller })
+      const { logs } = await executeOrderLegacy(assetId, itemPrice, {
+        from: buyer
+      })
+
+      // Event emitted
+      logs.length.should.be.equal(1)
+      checkOrderSuccessfulLog(
+        logs[0],
+        assetId,
+        seller,
+        legacyErc721.address,
+        itemPrice,
+        buyer
+      )
+    })
+
+    it('[LEGACY] should not execute a created order for a not legacy token', async function() {
+      await createOrder(erc721.address, assetId, itemPrice, endTime, {
+        from: seller
+      })
+      await executeOrderLegacy(assetId, itemPrice, {
         from: buyer
       }).should.be.rejectedWith(EVMRevert)
     })
@@ -573,7 +657,9 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
     it('should change publication Fee', async function() {
       let publicationFee = web3.toWei(0.005, 'ether')
 
-      let { logs } = await market.setPublicationFee(publicationFee, { from: owner })
+      let { logs } = await market.setPublicationFee(publicationFee, {
+        from: owner
+      })
       let r = await market.publicationFeeInWei()
       r.should.be.bignumber.equal(publicationFee)
       logs.length.should.be.equal(1)
@@ -594,7 +680,9 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
     it('should change owner sale cut', async function() {
       let ownerCut = 10
 
-      let { logs } = await market.setOwnerCutPercentage(ownerCut, { from: owner })
+      let { logs } = await market.setOwnerCutPercentage(ownerCut, {
+        from: owner
+      })
       let r = await market.ownerCutPercentage()
       r.should.be.bignumber.equal(ownerCut)
       logs.length.should.be.equal(1)
@@ -680,6 +768,94 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
       orderSeller.should.be.equal(seller, 'seller')
       orderPrice.should.be.bignumber.equal(itemPrice, 'itemPrice')
       orderExpiresAt.should.be.bignumber.equal(endTime, 'expiresAt')
+    })
+
+    it('should get legacy token with order getter', async function() {
+      await createOrderLegacy(assetId, itemPrice, endTime, {
+        from: seller
+      })
+
+      let s = await market.orderByAssetId.call(legacyErc721.address, assetId)
+      s[1].should.be.equal(seller)
+      s[2].should.be.equal(legacyErc721.address)
+      s[3].should.be.bignumber.equal(itemPrice)
+      s[4].should.be.bignumber.equal(endTime)
+    })
+
+    it('should get legacy token with order legacy getter', async function() {
+      await createOrder(legacyErc721.address, assetId, itemPrice, endTime, {
+        from: seller
+      })
+
+      // Check data
+      let s = await market.auctionByAssetId(assetId)
+      s[1].should.be.equal(seller)
+      s[2].should.be.bignumber.equal(itemPrice)
+      s[3].should.be.bignumber.equal(endTime)
+    })
+
+    it('should not get not legacy token with order legacy getter', async function() {
+      await createOrder(erc721.address, assetId, itemPrice, endTime, {
+        from: seller
+      })
+
+      // Check data
+      let s = await market.auctionByAssetId(assetId)
+      s[1].should.be.equal('0x0000000000000000000000000000000000000000')
+      s[2].should.be.bignumber.equal(0)
+      s[3].should.be.bignumber.equal(0)
+    })
+  })
+
+  describe('setLegacyNFTAddress', function() {
+    it('should return the legacy nft address', async function() {
+      const address = await market.legacyNFTAddress()
+      address.should.be.equal(legacyErc721.address)
+    })
+
+    it('should change the legacy nft address', async function() {
+      let address = await market.legacyNFTAddress()
+      address.should.be.equal(legacyErc721.address)
+
+      const { logs } = await market.setLegacyNFTAddress(
+        erc721.address,
+        fromOwner
+      )
+
+      // Event emitted
+      logs.length.should.be.equal(1)
+      checkSetLegacyNFTAddressLog(logs[0], erc721.address)
+      address = await market.legacyNFTAddress()
+      address.should.be.equal(erc721.address)
+    })
+
+    it('should rever if not the owner try to change the legacy nft address', async function() {
+      await market
+        .setLegacyNFTAddress(erc721.address)
+        .should.be.rejectedWith(EVMRevert)
+    })
+
+    it('should revert when changing legacy nft address with an invalid contract address', async function() {
+      let address = await market.legacyNFTAddress()
+      address.should.be.equal(legacyErc721.address)
+
+      await market
+        .setLegacyNFTAddress(0, fromOwner)
+        .should.be.rejectedWith(EVMRevert)
+
+      await market
+        .setLegacyNFTAddress(
+          '0x0000000000000000000000000000000000000000',
+          fromOwner
+        )
+        .should.be.rejectedWith(EVMRevert)
+
+      await market
+        .setLegacyNFTAddress('0x123', fromOwner)
+        .should.be.rejectedWith(EVMRevert)
+
+      address = await market.legacyNFTAddress()
+      address.should.be.equal(legacyErc721.address)
     })
   })
 })
