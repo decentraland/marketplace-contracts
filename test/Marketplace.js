@@ -54,6 +54,16 @@ function checkOrderSuccessfulLog(
   log.args.buyer.should.be.equal(buyer, 'buyer')
 }
 
+function checkChangedPublicationFeeLog(log, publicationFee) {
+  log.event.should.be.eq('ChangedPublicationFee')
+  log.args.publicationFee.should.be.bignumber.equal(publicationFee, 'publicationFee')
+}
+
+function checkChangedOwnerCutPercentageLog(log, ownerCutPercentage) {
+  log.event.should.be.eq('ChangedOwnerCutPercentage')
+  log.args.ownerCutPercentage.should.be.bignumber.equal(ownerCutPercentage, 'ownerCutPercentage')
+}
+
 function getEndTime(minutesAhead = 15) {
   return web3.eth.getBlock('latest').timestamp + duration.minutes(minutesAhead)
 }
@@ -103,10 +113,24 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
 
     // Assign balance to buyer and allow marketplace to move ERC20
     await erc20.setBalance(buyer, web3.toWei(10, 'ether'))
+    await erc20.setBalance(seller, web3.toWei(10, 'ether'))
     await erc20.approve(market.address, 1e30, { from: seller })
     await erc20.approve(market.address, 1e30, { from: buyer })
 
     endTime = getEndTime()
+  })
+
+  describe('Initialize', function() {
+    it('should initialize with token', async function() {
+      let _market = await Marketplace.new(erc20.address, { from: owner})
+      let t = await _market.acceptedToken.call();
+
+      t.should.be.equal(erc20.address)
+    })
+
+    it('should revert if token does not exist', async function() {
+      await Marketplace.new(0, { from: owner}).should.be.rejectedWith(EVMRevert)
+    })
   })
 
   describe('Create', function() {
@@ -194,6 +218,30 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
           from: seller
         })
         .should.be.rejectedWith(EVMRevert)
+    })
+
+    it('should fail to create an order :: (price is 0)', async function() {
+      await market.createOrder(erc721.address, assetId, 0, endTime, { from: seller })
+      .should.be.rejectedWith(EVMRevert)
+    })
+
+    it('should fail to create an order :: (expires too soon)', async function() {
+      const newTime = web3.eth.getBlock('latest').timestamp + duration.seconds(59);
+      await market.createOrder(erc721.address, assetId, itemPrice, newTime, { from: seller })
+      .should.be.rejectedWith(EVMRevert)
+    })
+
+    it('should fail to create an order :: (nft not approved)', async function() {
+      await erc721.setApprovalForAll(market.address, false, { from: seller })
+      await market.createOrder(erc721.address, assetId, itemPrice, endTime, { from: seller })
+      .should.be.rejectedWith(EVMRevert)
+    })
+
+    it('should fail to create an order :: (publication fee not paid)', async function() {
+      await erc20.approve(market.address, 1, { from: seller })
+      await market.setPublicationFee(2, { from: owner })
+      await market.createOrder(erc721.address, assetId, itemPrice, endTime, { from: seller })
+      .should.be.rejectedWith(EVMRevert)
     })
   })
 
@@ -438,9 +486,11 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
     it('should change publication Fee', async function() {
       let publicationFee = web3.toWei(0.005, 'ether')
 
-      await market.setPublicationFee(publicationFee, { from: owner })
+      let { logs } = await market.setPublicationFee(publicationFee, { from: owner })
       let r = await market.publicationFeeInWei()
       r.should.be.bignumber.equal(publicationFee)
+      logs.length.should.be.equal(1)
+      checkChangedPublicationFeeLog(logs[0], publicationFee)
     })
 
     it('should fail to change publication Fee (not owner)', async function() {
@@ -457,9 +507,11 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
     it('should change owner sale cut', async function() {
       let ownerCut = 10
 
-      await market.setOwnerCutPercentage(ownerCut, { from: owner })
+      let { logs } = await market.setOwnerCutPercentage(ownerCut, { from: owner })
       let r = await market.ownerCutPercentage()
       r.should.be.bignumber.equal(ownerCut)
+      logs.length.should.be.equal(1)
+      checkChangedOwnerCutPercentageLog(logs[0], ownerCut)
     })
 
     it('should fail to change owner cut (% invalid above)', async function() {
