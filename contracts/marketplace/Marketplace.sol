@@ -58,6 +58,8 @@ contract Marketplace is Migratable, Ownable, Pausable {
   uint256 public ownerCutPercentage;
   uint256 public publicationFeeInWei;
 
+  address public legacyNFTAddress;
+
   bytes4 public constant InterfaceId_ValidateFingerprint = bytes4(
     keccak256("verifyFingerprint(uint256,bytes)")
   );
@@ -88,24 +90,13 @@ contract Marketplace is Migratable, Ownable, Pausable {
 
   event ChangedPublicationFee(uint256 publicationFee);
   event ChangedOwnerCutPercentage(uint256 ownerCutPercentage);
-
-  /**
-    * @dev Initialize this contract. Acts as a constructor
-    * @param _acceptedToken - Address of the ERC20 accepted for this marketplace
-    */
-  function initialize(address _acceptedToken) public isInitializer("Marketplace", "0.0.1") {
-    Pausable.initialize(msg.sender); // Calls ownable behind the scenes...sigh
-
-    // this check will fail when calling from the construction of the erc20 token
-    require(_acceptedToken.isContract(), "Address must be a deployed contract");
-    acceptedToken = ERC20Interface(_acceptedToken);
-  }
+  event ChangeLegacyNFTAddress(address indexed legacyNFTAddress);
 
   /**
     * @dev Sets the publication fee that's charged to users to publish items
     * @param publicationFee - Fee amount in wei this contract charges to publish an item
     */
-  function setPublicationFee(uint256 publicationFee) public onlyOwner {
+  function setPublicationFee(uint256 publicationFee) external onlyOwner {
     publicationFeeInWei = publicationFee;
 
     emit ChangedPublicationFee(publicationFeeInWei);
@@ -116,12 +107,45 @@ contract Marketplace is Migratable, Ownable, Pausable {
     *  charged to the seller on a successful sale
     * @param _ownerCutPercentage - Share amount, from 0 to 100
     */
-  function setOwnerCutPercentage(uint256 _ownerCutPercentage) public onlyOwner {
+  function setOwnerCutPercentage(uint256 _ownerCutPercentage) external onlyOwner {
     require(_ownerCutPercentage < 100, "The owner cut should be between 0 and 100");
 
     ownerCutPercentage = _ownerCutPercentage;
 
     emit ChangedOwnerCutPercentage(ownerCutPercentage);
+  }
+
+  /**
+    * @dev Sets the legacy NFT address to be used
+    * @param _legacyNFTAddress - Address of the NFT address used for legacy methods that don't have nftAddress as parameter
+    */
+  function setLegacyNFTAddress(address _legacyNFTAddress) external onlyOwner {
+    require(_legacyNFTAddress.isContract(), "The address should be a contract");
+
+    legacyNFTAddress = _legacyNFTAddress;
+    emit ChangeLegacyNFTAddress(legacyNFTAddress);
+  }
+
+  /**
+    * @dev Initialize this contract. Acts as a constructor
+    * @param _acceptedToken - Address of the ERC20 accepted for this marketplace
+    * @param _legacyNFTAddress - Address of the NFT address used for legacy methods that don't have nftAddress as parameter
+    */
+  function initialize(
+    address _acceptedToken,
+    address _legacyNFTAddress
+  )
+    public
+    isInitializer("Marketplace", "0.0.1")
+  {
+    Pausable.initialize(msg.sender); // Calls ownable behind the scenes...sigh
+
+    // this check will fail when calling from the construction of the erc20 token
+    require(_acceptedToken.isContract(), "The accepted token address must be a deployed contract");
+    acceptedToken = ERC20Interface(_acceptedToken);
+
+    require(_legacyNFTAddress.isContract(), "The legacy NFT address should be a deployed contract");
+    legacyNFTAddress = _legacyNFTAddress;
   }
 
   /**
@@ -139,6 +163,139 @@ contract Marketplace is Migratable, Ownable, Pausable {
   )
     public
     whenNotPaused
+  {
+    _createOrder(
+      nftAddress,
+      assetId,
+      priceInWei,
+      expiresAt
+    );
+  }
+
+  /**
+    * @dev [LEGACY] Creates a new order
+    * @param assetId - ID of the published NFT
+    * @param priceInWei - Price in Wei for the supported coin
+    * @param expiresAt - Duration of the order (in hours)
+    */
+  function createOrder(uint256 assetId, uint256 priceInWei, uint256 expiresAt) public whenNotPaused {
+    _createOrder(
+      legacyNFTAddress,
+      assetId,
+      priceInWei,
+      expiresAt
+    );
+  }
+
+  /**
+    * @dev Cancel an already published order
+    *  can only be canceled by seller or the contract owner
+    * @param nftAddress - Address of the NFT registry
+    * @param assetId - ID of the published NFT
+    */
+  function cancelOrder(address nftAddress, uint256 assetId) public whenNotPaused {
+    _cancelOrder(nftAddress, assetId);
+  }
+
+  /**
+    * @dev [LEGACY] Cancel an already published order
+    *  can only be canceled by seller or the contract owner
+    * @param assetId - ID of the published NFT
+    */
+  function cancelOrder(uint256 assetId) public whenNotPaused {
+    _cancelOrder(legacyNFTAddress, assetId);
+  }
+
+  /**
+    * @dev Executes the sale for a published NFT and checks for the asset fingerprint
+    * @param nftAddress - Address of the NFT registry
+    * @param assetId - ID of the published NFT
+    * @param price - Order price
+    * @param fingerprint - Verification info for the asset
+    */
+  function safeExecuteOrder(
+    address nftAddress,
+    uint256 assetId,
+    uint256 price,
+    bytes fingerprint
+  )
+   public
+   whenNotPaused
+  {
+    _executeOrder(
+      nftAddress,
+      assetId,
+      price,
+      fingerprint
+    );
+  }
+
+  /**
+    * @dev Executes the sale for a published NFT
+    * @param nftAddress - Address of the NFT registry
+    * @param assetId - ID of the published NFT
+    * @param price - Order price
+    */
+  function executeOrder(
+    address nftAddress,
+    uint256 assetId,
+    uint256 price
+  )
+   public
+   whenNotPaused
+  {
+    _executeOrder(
+      nftAddress,
+      assetId,
+      price,
+      ""
+    );
+  }
+
+  /**
+    * @dev [LEGACY] Executes the sale for a published NFT
+    * @param assetId - ID of the published NFT
+    * @param price - Order price
+    */
+  function executeOrder(
+    uint256 assetId,
+    uint256 price
+  )
+   public
+   whenNotPaused
+  {
+    _executeOrder(
+      legacyNFTAddress,
+      assetId,
+      price,
+      ""
+    );
+  }
+
+  /**
+    * @dev [LEGACY] Gets an order using the legacy NFT address.
+    * @dev It's equivalent to orderByAssetId[legacyNFTAddress][assetId] but returns same structure as the old Auction
+    * @param assetId - ID of the published NFT
+    */
+  function auctionByAssetId(uint256 assetId) public view returns (bytes32, address, uint256, uint256) {
+    Order memory order = orderByAssetId[legacyNFTAddress][assetId];
+    return (order.id, order.seller, order.price, order.expiresAt);
+  }
+
+  /**
+    * @dev Creates a new order
+    * @param nftAddress - Non fungible registry address
+    * @param assetId - ID of the published NFT
+    * @param priceInWei - Price in Wei for the supported coin
+    * @param expiresAt - Duration of the order (in hours)
+    */
+  function _createOrder(
+    address nftAddress,
+    uint256 assetId,
+    uint256 priceInWei,
+    uint256 expiresAt
+  )
+    internal
   {
     require(nftAddress.isContract(), "The NFT Address should be a contract");
 
@@ -196,7 +353,7 @@ contract Marketplace is Migratable, Ownable, Pausable {
     * @param nftAddress - Address of the NFT registry
     * @param assetId - ID of the published NFT
     */
-  function cancelOrder(address nftAddress, uint256 assetId) public whenNotPaused {
+  function _cancelOrder(address nftAddress, uint256 assetId) internal {
     Order memory order = orderByAssetId[nftAddress][assetId];
 
     require(order.id != 0, "Asset not published");
@@ -212,52 +369,6 @@ contract Marketplace is Migratable, Ownable, Pausable {
       assetId,
       orderSeller,
       orderNftAddress
-    );
-  }
-
-  /**
-    * @dev Executes the sale for a published NFT and checks for the asset fingerprint
-    * @param nftAddress - Address of the NFT registry
-    * @param assetId - ID of the published NFT
-    * @param price - Order price
-    * @param fingerprint - Verification info for the asset
-    */
-  function safeExecuteOrder(
-    address nftAddress,
-    uint256 assetId,
-    uint256 price,
-    bytes fingerprint
-  )
-   public
-   whenNotPaused
-  {
-    _executeOrder(
-      nftAddress,
-      assetId,
-      price,
-      fingerprint
-    );
-  }
-
-  /**
-    * @dev Executes the sale for a published NFT
-    * @param nftAddress - Address of the NFT registry
-    * @param assetId - ID of the published NFT
-    * @param price - Order price
-    */
-  function executeOrder(
-    address nftAddress,
-    uint256 assetId,
-    uint256 price
-  )
-   public
-   whenNotPaused
-  {
-    _executeOrder(
-      nftAddress,
-      assetId,
-      price,
-      ""
     );
   }
 
