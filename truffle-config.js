@@ -16,6 +16,12 @@ const ropstenProvider = process.env.SOLIDITY_COVERAGE
   : infuraProvider('ropsten')
 
 module.exports = {
+  solc: {
+    optimizer: {
+      enabled: true,
+      runs: 200
+    }
+  },
   networks: {
     local: {
       host: 'localhost',
@@ -29,6 +35,12 @@ module.exports = {
       network_id: '*' // eslint-disable-line camelcase
     },
     ropsten: {
+      host: 'localhost',
+      port: 8545,
+      network_id: 3,
+      gas: 30000000
+    },
+    infura_ropsten: {
       provider: ropstenProvider,
       network_id: 3 // eslint-disable-line camelcase
     },
