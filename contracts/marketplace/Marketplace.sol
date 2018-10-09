@@ -6,91 +6,12 @@ import "openzeppelin-zos/contracts/math/SafeMath.sol";
 import "openzeppelin-zos/contracts/AddressUtils.sol";
 import "zos-lib/contracts/migrations/Migratable.sol";
 
-
-/**
- * @title Interface for contracts conforming to ERC-20
- */
-contract ERC20Interface {
-  function transferFrom(address from, address to, uint tokens) public returns (bool success);
-}
+import "./MarketplaceStorage.sol";
 
 
-/**
- * @title Interface for contracts conforming to ERC-721
- */
-contract ERC721Interface {
-  function ownerOf(uint256 _tokenId) public view returns (address _owner);
-  function approve(address _to, uint256 _tokenId) public;
-  function getApproved(uint256 _tokenId) public view returns (address);
-  function isApprovedForAll(address _owner, address _operator) public view returns (bool);
-  function safeTransferFrom(address _from, address _to, uint256 _tokenId) public;
-  function supportsInterface(bytes4) public view returns (bool);
-}
-
-
-contract ERC721Verifiable is ERC721Interface {
-  function verifyFingerprint(uint256, bytes) public view returns (bool);
-}
-
-
-contract Marketplace is Migratable, Ownable, Pausable {
+contract Marketplace is Migratable, Ownable, Pausable, MarketplaceStorage {
   using SafeMath for uint256;
   using AddressUtils for address;
-
-  ERC20Interface public acceptedToken;
-
-  struct Order {
-    // Order ID
-    bytes32 id;
-    // Owner of the NFT
-    address seller;
-    // NFT registry address
-    address nftAddress;
-    // Price (in wei) for the published item
-    uint256 price;
-    // Time when this sale ends
-    uint256 expiresAt;
-  }
-
-  // From ERC721 registry assetId to Order (to avoid asset collision)
-  mapping (address => mapping(uint256 => Order)) public orderByAssetId;
-
-  uint256 public ownerCutPercentage;
-  uint256 public publicationFeeInWei;
-
-  address public legacyNFTAddress;
-
-  bytes4 public constant InterfaceId_ValidateFingerprint = bytes4(
-    keccak256("verifyFingerprint(uint256,bytes)")
-  );
-
-  /* EVENTS */
-  event OrderCreated(
-    bytes32 id,
-    uint256 indexed assetId,
-    address indexed seller,
-    address nftAddress,
-    uint256 priceInWei,
-    uint256 expiresAt
-  );
-  event OrderSuccessful(
-    bytes32 id,
-    uint256 indexed assetId,
-    address indexed seller,
-    address nftAddress,
-    uint256 totalPrice,
-    address indexed buyer
-  );
-  event OrderCancelled(
-    bytes32 id,
-    uint256 indexed assetId,
-    address indexed seller,
-    address nftAddress
-  );
-
-  event ChangedPublicationFee(uint256 publicationFee);
-  event ChangedOwnerCutPercentage(uint256 ownerCutPercentage);
-  event ChangeLegacyNFTAddress(address indexed legacyNFTAddress);
 
   /**
     * @dev Sets the publication fee that's charged to users to publish items
@@ -185,6 +106,15 @@ contract Marketplace is Migratable, Ownable, Pausable {
       priceInWei,
       expiresAt
     );
+
+    Order memory order = orderByAssetId[legacyNFTAddress][assetId];
+    emit AuctionCreated(
+      order.id,
+      assetId,
+      order.seller,
+      order.price,
+      order.expiresAt
+    );
   }
 
   /**
@@ -203,7 +133,13 @@ contract Marketplace is Migratable, Ownable, Pausable {
     * @param assetId - ID of the published NFT
     */
   function cancelOrder(uint256 assetId) public whenNotPaused {
-    _cancelOrder(legacyNFTAddress, assetId);
+    Order memory order = _cancelOrder(legacyNFTAddress, assetId);
+
+    emit AuctionCancelled(
+      order.id,
+      assetId,
+      order.seller
+    );
   }
 
   /**
@@ -264,11 +200,19 @@ contract Marketplace is Migratable, Ownable, Pausable {
    public
    whenNotPaused
   {
-    _executeOrder(
+    Order memory order = _executeOrder(
       legacyNFTAddress,
       assetId,
       price,
       ""
+    );
+    
+    emit AuctionSuccessful(
+      order.id,
+      assetId,
+      order.seller,
+      price,
+      msg.sender
     );
   }
 
@@ -353,7 +297,7 @@ contract Marketplace is Migratable, Ownable, Pausable {
     * @param nftAddress - Address of the NFT registry
     * @param assetId - ID of the published NFT
     */
-  function _cancelOrder(address nftAddress, uint256 assetId) internal {
+  function _cancelOrder(address nftAddress, uint256 assetId) internal returns (Order) {
     Order memory order = orderByAssetId[nftAddress][assetId];
 
     require(order.id != 0, "Asset not published");
@@ -370,6 +314,8 @@ contract Marketplace is Migratable, Ownable, Pausable {
       orderSeller,
       orderNftAddress
     );
+
+    return order;
   }
 
   /**
@@ -385,7 +331,7 @@ contract Marketplace is Migratable, Ownable, Pausable {
     uint256 price,
     bytes fingerprint
   )
-   internal
+   internal returns (Order)
   {
     ERC721Verifiable nftRegistry = ERC721Verifiable(nftAddress);
 
@@ -444,5 +390,7 @@ contract Marketplace is Migratable, Ownable, Pausable {
       price,
       msg.sender
     );
+
+    return order;
   }
 }
