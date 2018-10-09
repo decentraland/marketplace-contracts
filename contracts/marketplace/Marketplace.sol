@@ -41,7 +41,7 @@ contract Marketplace is Migratable, Ownable, Pausable, MarketplaceStorage {
     * @param _legacyNFTAddress - Address of the NFT address used for legacy methods that don't have nftAddress as parameter
     */
   function setLegacyNFTAddress(address _legacyNFTAddress) external onlyOwner {
-    require(_legacyNFTAddress.isContract(), "The address should be a contract");
+    _requireERC721(_legacyNFTAddress);
 
     legacyNFTAddress = _legacyNFTAddress;
     emit ChangeLegacyNFTAddress(legacyNFTAddress);
@@ -65,7 +65,7 @@ contract Marketplace is Migratable, Ownable, Pausable, MarketplaceStorage {
     require(_acceptedToken.isContract(), "The accepted token address must be a deployed contract");
     acceptedToken = ERC20Interface(_acceptedToken);
 
-    require(_legacyNFTAddress.isContract(), "The legacy NFT address should be a deployed contract");
+    _requireERC721(_legacyNFTAddress);
     legacyNFTAddress = _legacyNFTAddress;
   }
 
@@ -255,14 +255,9 @@ contract Marketplace is Migratable, Ownable, Pausable, MarketplaceStorage {
   )
     internal
   {
-    require(nftAddress.isContract(), "The NFT Address should be a contract");
+    _requireERC721(nftAddress);
 
     ERC721Interface nftRegistry = ERC721Interface(nftAddress);
-    require(
-      nftRegistry.supportsInterface(ERC721_Interface),
-      "The NFT contract has an invalid ERC721 implementation"
-    );
-
     address assetOwner = nftRegistry.ownerOf(assetId);
 
     require(msg.sender == assetOwner, "Only the owner can create orders");
@@ -352,11 +347,9 @@ contract Marketplace is Migratable, Ownable, Pausable, MarketplaceStorage {
   )
    internal returns (Order)
   {
+    _requireERC721(nftAddress);
+
     ERC721Verifiable nftRegistry = ERC721Verifiable(nftAddress);
-    require(
-      nftRegistry.supportsInterface(ERC721_Interface),
-      "The NFT contract has an invalid ERC721 implementation"
-    );
 
     if (nftRegistry.supportsInterface(InterfaceId_ValidateFingerprint)) {
       require(
@@ -415,5 +408,15 @@ contract Marketplace is Migratable, Ownable, Pausable, MarketplaceStorage {
     );
 
     return order;
+  }
+
+  function _requireERC721(address nftAddress) internal view {
+    require(nftAddress.isContract(), "The NFT Address should be a contract");
+
+    ERC721Interface nftRegistry = ERC721Interface(nftAddress);
+    require(
+      nftRegistry.supportsInterface(ERC721_Interface),
+      "The NFT contract has an invalid ERC721 implementation"
+    );
   }
 }
