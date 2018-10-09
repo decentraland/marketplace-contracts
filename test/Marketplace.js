@@ -192,7 +192,7 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
     legacyErc721 = await LegacyERC721.new('OLDLAND', 'OLDDCL', creationParams)
 
     // Create a Marketplace with mocks
-    market = await Marketplace.new(erc20.address, legacyErc721.address, {
+    market = await Marketplace.new(erc20.address, legacyErc721.address, owner, {
       from: owner
     })
 
@@ -226,38 +226,51 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
 
   describe('Initialize', function() {
     it('should initialize with token', async function() {
-      let _market = await Marketplace.new(erc20.address, legacyErc721.address, {
-        from: owner
-      })
+      let _market = await Marketplace.new(
+        erc20.address,
+        legacyErc721.address,
+        owner,
+        { from: owner }
+      )
       let acceptedToken = await _market.acceptedToken.call()
 
       acceptedToken.should.be.equal(erc20.address)
     })
 
     it('should revert if token is invalid', async function() {
-      await Marketplace.new(0, legacyErc721.address, {
+      await Marketplace.new(0, legacyErc721.address, owner, {
         from: owner
       }).should.be.rejectedWith(EVMRevert)
 
-      await Marketplace.new(zeroAddress, legacyErc721.address, {
+      await Marketplace.new(zeroAddress, legacyErc721.address, owner, {
         from: owner
       }).should.be.rejectedWith(EVMRevert)
 
-      await Marketplace.new('0x1234', legacyErc721.address, {
+      await Marketplace.new('0x1234', legacyErc721.address, owner, {
         from: owner
       }).should.be.rejectedWith(EVMRevert)
     })
 
     it('should revert if nft address is invalid', async function() {
-      await Marketplace.new(erc20.address, 0, {
+      await Marketplace.new(erc20.address, 0, owner, {
         from: owner
       }).should.be.rejectedWith(EVMRevert)
 
-      await Marketplace.new(erc20.address, zeroAddress, {
+      await Marketplace.new(erc20.address, zeroAddress, owner, {
         from: owner
       }).should.be.rejectedWith(EVMRevert)
 
-      await Marketplace.new(erc20.address, '0x1234', {
+      await Marketplace.new(erc20.address, '0x1234', owner, {
+        from: owner
+      }).should.be.rejectedWith(EVMRevert)
+    })
+
+    it('should revert if owner is invalid', async function() {
+      await Marketplace.new(erc20.address, legacyErc721.address, 0, {
+        from: owner
+      }).should.be.rejectedWith(EVMRevert)
+
+      await Marketplace.new(erc20.address, legacyErc721.address, zeroAddress, {
         from: owner
       }).should.be.rejectedWith(EVMRevert)
     })
@@ -702,20 +715,32 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
   })
 
   describe('setPublicationFee', function() {
-    it('should change publication Fee', async function() {
-      let publicationFee = web3.toWei(0.005, 'ether')
-
-      let { logs } = await market.setPublicationFee(publicationFee, {
-        from: owner
-      })
-      let r = await market.publicationFeeInWei()
-      r.should.be.bignumber.equal(publicationFee)
-      logs.length.should.be.equal(1)
-      checkChangedPublicationFeeLog(logs[0], publicationFee)
+    it('should be initialized to 0', async function() {
+      const response = await market.publicationFeeInWei()
+      response.should.be.bignumber.equal(0)
     })
 
-    it('should fail to change publication Fee (not owner)', async function() {
+    it('should change publication fee', async function() {
       let publicationFee = web3.toWei(0.005, 'ether')
+
+      const { logs } = await market.setPublicationFee(publicationFee, {
+        from: owner
+      })
+      let response = await market.publicationFeeInWei()
+      response.should.be.bignumber.equal(publicationFee)
+      logs.length.should.be.equal(1)
+      checkChangedPublicationFeeLog(logs[0], publicationFee)
+
+      await market.setPublicationFee(0, {
+        from: owner
+      })
+
+      response = await market.publicationFeeInWei()
+      response.should.be.bignumber.equal(0)
+    })
+
+    it('should fail to change publication fee (not owner)', async function() {
+      const publicationFee = web3.toWei(0.005, 'ether')
 
       await market
         .setPublicationFee(publicationFee, { from: seller })
@@ -723,30 +748,43 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
     })
   })
 
-  // Test owner sale cut.
   describe('ownerCutPercentage', function() {
-    it('should change owner sale cut', async function() {
-      let ownerCut = 10
+    it('should be initialized to 0', async function() {
+      const response = await market.ownerCutPercentage()
+      response.should.be.bignumber.equal(0)
+    })
 
-      let { logs } = await market.setOwnerCutPercentage(ownerCut, {
+    it('should change owner sale cut', async function() {
+      const ownerCut = 10
+
+      const { logs } = await market.setOwnerCutPercentage(ownerCut, {
         from: owner
       })
-      let r = await market.ownerCutPercentage()
-      r.should.be.bignumber.equal(ownerCut)
+      let response = await market.ownerCutPercentage()
+      response.should.be.bignumber.equal(ownerCut)
       logs.length.should.be.equal(1)
       checkChangedOwnerCutPercentageLog(logs[0], ownerCut)
+
+      await market.setOwnerCutPercentage(0, {
+        from: owner
+      })
+      response = await market.ownerCutPercentage()
+      response.should.be.bignumber.equal(0)
     })
 
     it('should fail to change owner cut (% invalid above)', async function() {
-      let ownerCut = 200
-
       await market
-        .setOwnerCutPercentage(ownerCut, { from: owner })
+        .setOwnerCutPercentage(100, { from: owner })
+        .should.be.rejectedWith(EVMRevert)
+
+      // -1 is a uint256 in solidity 1.157920892373162e+77
+      await market
+        .setOwnerCutPercentage(-1, { from: owner })
         .should.be.rejectedWith(EVMRevert)
     })
 
     it('should fail to change owner cut (not owner)', async function() {
-      let ownerCut = 10
+      const ownerCut = 10
 
       await market
         .setOwnerCutPercentage(ownerCut, { from: seller })

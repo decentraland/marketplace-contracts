@@ -15,24 +15,22 @@ contract Marketplace is Migratable, Ownable, Pausable, MarketplaceStorage {
 
   /**
     * @dev Sets the publication fee that's charged to users to publish items
-    * @param publicationFee - Fee amount in wei this contract charges to publish an item
+    * @param _publicationFee - Fee amount in wei this contract charges to publish an item
     */
-  function setPublicationFee(uint256 publicationFee) external onlyOwner {
-    publicationFeeInWei = publicationFee;
-
+  function setPublicationFee(uint256 _publicationFee) external onlyOwner {
+    publicationFeeInWei = _publicationFee;
     emit ChangedPublicationFee(publicationFeeInWei);
   }
 
   /**
     * @dev Sets the share cut for the owner of the contract that's
     *  charged to the seller on a successful sale
-    * @param _ownerCutPercentage - Share amount, from 0 to 100
+    * @param _ownerCutPercentage - Share amount, from 0 to 99
     */
   function setOwnerCutPercentage(uint256 _ownerCutPercentage) external onlyOwner {
-    require(_ownerCutPercentage < 100, "The owner cut should be between 0 and 100");
+    require(_ownerCutPercentage < 100, "The owner cut should be between 0 and 99");
 
     ownerCutPercentage = _ownerCutPercentage;
-
     emit ChangedOwnerCutPercentage(ownerCutPercentage);
   }
 
@@ -54,13 +52,17 @@ contract Marketplace is Migratable, Ownable, Pausable, MarketplaceStorage {
     */
   function initialize(
     address _acceptedToken,
-    address _legacyNFTAddress
+    address _legacyNFTAddress,
+    address _owner
   )
     public
     isInitializer("Marketplace", "0.0.1")
   {
-    Pausable.initialize(msg.sender); // Calls ownable behind the scenes...sigh
 
+    // msg.sender is the App contract not the real owner. Calls ownable behind the scenes...sigh
+    require(_owner != address(0), "Invalid owner");
+    Pausable.initialize(_owner); 
+    
     require(_acceptedToken.isContract(), "The accepted token address must be a deployed contract");
     acceptedToken = ERC20Interface(_acceptedToken);
 
