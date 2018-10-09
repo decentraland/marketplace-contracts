@@ -229,9 +229,9 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
       let _market = await Marketplace.new(erc20.address, legacyErc721.address, {
         from: owner
       })
-      let t = await _market.acceptedToken.call()
+      let acceptedToken = await _market.acceptedToken.call()
 
-      t.should.be.equal(erc20.address)
+      acceptedToken.should.be.equal(erc20.address)
     })
 
     it('should revert if token is invalid', async function() {

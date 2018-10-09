@@ -55,6 +55,8 @@ contract MarketplaceStorage {
     keccak256("verifyFingerprint(uint256,bytes)")
   );
 
+  bytes4 public constant ERC721_Interface = bytes4(0x80ac58cd);
+
   // EVENTS
   event OrderCreated(
     bytes32 id,

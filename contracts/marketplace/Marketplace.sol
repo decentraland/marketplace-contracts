@@ -206,7 +206,7 @@ contract Marketplace is Migratable, Ownable, Pausable, MarketplaceStorage {
       price,
       ""
     );
-    
+
     emit AuctionSuccessful(
       order.id,
       assetId,
@@ -244,6 +244,11 @@ contract Marketplace is Migratable, Ownable, Pausable, MarketplaceStorage {
     require(nftAddress.isContract(), "The NFT Address should be a contract");
 
     ERC721Interface nftRegistry = ERC721Interface(nftAddress);
+    require(
+      nftRegistry.supportsInterface(ERC721_Interface),
+      "The NFT contract has an invalid ERC721 implementation"
+    );
+
     address assetOwner = nftRegistry.ownerOf(assetId);
 
     require(msg.sender == assetOwner, "Only the owner can create orders");
@@ -334,6 +339,10 @@ contract Marketplace is Migratable, Ownable, Pausable, MarketplaceStorage {
    internal returns (Order)
   {
     ERC721Verifiable nftRegistry = ERC721Verifiable(nftAddress);
+    require(
+      nftRegistry.supportsInterface(ERC721_Interface),
+      "The NFT contract has an invalid ERC721 implementation"
+    );
 
     if (nftRegistry.supportsInterface(InterfaceId_ValidateFingerprint)) {
       require(
