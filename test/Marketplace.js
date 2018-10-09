@@ -556,6 +556,16 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
       }).should.be.rejectedWith(EVMRevert)
     })
 
+    it('should fail to execute a created order :: (not an ERC721 contract)', async function() {
+      await createOrder(erc721.address, assetId, itemPrice, endTime, {
+        from: seller
+      })
+      // Not cover it at 100% but we should see it as an upgradeable contract
+      await executeOrder(erc20.address, assetId, itemPrice, {
+        from: buyer
+      }).should.be.rejectedWith(EVMRevert)
+    })
+
     it('[LEGACY] should execute a created order', async function() {
       await createOrder(legacyErc721.address, assetId, itemPrice, endTime, {
         from: seller
