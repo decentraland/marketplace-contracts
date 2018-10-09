@@ -230,9 +230,7 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
         erc20.address,
         legacyErc721.address,
         owner,
-        {
-          from: owner
-        }
+        { from: owner }
       )
       let acceptedToken = await _market.acceptedToken.call()
 
@@ -717,6 +715,11 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
   })
 
   describe('setPublicationFee', function() {
+    it('should be initialized to 0', async function() {
+      const response = await market.publicationFeeInWei()
+      response.should.be.bignumber.equal(0)
+    })
+
     it('should change publication fee', async function() {
       let publicationFee = web3.toWei(0.005, 'ether')
 
@@ -745,8 +748,12 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
     })
   })
 
-  // Test owner sale cut.
   describe('ownerCutPercentage', function() {
+    it('should be initialized to 0', async function() {
+      const response = await market.ownerCutPercentage()
+      response.should.be.bignumber.equal(0)
+    })
+
     it('should change owner sale cut', async function() {
       const ownerCut = 10
 
@@ -770,6 +777,7 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
         .setOwnerCutPercentage(100, { from: owner })
         .should.be.rejectedWith(EVMRevert)
 
+      // -1 is a uint256 in solidity 1.157920892373162e+77
       await market
         .setOwnerCutPercentage(-1, { from: owner })
         .should.be.rejectedWith(EVMRevert)
