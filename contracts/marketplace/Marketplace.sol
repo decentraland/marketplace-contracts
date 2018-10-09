@@ -99,7 +99,14 @@ contract Marketplace is Migratable, Ownable, Pausable, MarketplaceStorage {
     * @param priceInWei - Price in Wei for the supported coin
     * @param expiresAt - Duration of the order (in hours)
     */
-  function createOrder(uint256 assetId, uint256 priceInWei, uint256 expiresAt) public whenNotPaused {
+  function createOrder(
+    uint256 assetId,
+    uint256 priceInWei,
+    uint256 expiresAt
+  )
+    public
+    whenNotPaused
+  {
     _createOrder(
       legacyNFTAddress,
       assetId,
@@ -221,7 +228,14 @@ contract Marketplace is Migratable, Ownable, Pausable, MarketplaceStorage {
     * @dev It's equivalent to orderByAssetId[legacyNFTAddress][assetId] but returns same structure as the old Auction
     * @param assetId - ID of the published NFT
     */
-  function auctionByAssetId(uint256 assetId) public view returns (bytes32, address, uint256, uint256) {
+  function auctionByAssetId(
+    uint256 assetId
+  )
+    public
+    view
+    returns
+    (bytes32, address, uint256, uint256)
+  {
     Order memory order = orderByAssetId[legacyNFTAddress][assetId];
     return (order.id, order.seller, order.price, order.expiresAt);
   }
