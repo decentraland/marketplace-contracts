@@ -41,7 +41,7 @@ contract Marketplace is Migratable, Ownable, Pausable, MarketplaceStorage {
     * @param _legacyNFTAddress - Address of the NFT address used for legacy methods that don't have nftAddress as parameter
     */
   function setLegacyNFTAddress(address _legacyNFTAddress) external onlyOwner {
-    require(_legacyNFTAddress.isContract(), "The address should be a contract");
+    _requireERC721(_legacyNFTAddress);
 
     legacyNFTAddress = _legacyNFTAddress;
     emit ChangeLegacyNFTAddress(legacyNFTAddress);
@@ -61,11 +61,10 @@ contract Marketplace is Migratable, Ownable, Pausable, MarketplaceStorage {
   {
     Pausable.initialize(msg.sender); // Calls ownable behind the scenes...sigh
 
-    // this check will fail when calling from the construction of the erc20 token
     require(_acceptedToken.isContract(), "The accepted token address must be a deployed contract");
     acceptedToken = ERC20Interface(_acceptedToken);
 
-    require(_legacyNFTAddress.isContract(), "The legacy NFT address should be a deployed contract");
+    _requireERC721(_legacyNFTAddress);
     legacyNFTAddress = _legacyNFTAddress;
   }
 
@@ -99,7 +98,14 @@ contract Marketplace is Migratable, Ownable, Pausable, MarketplaceStorage {
     * @param priceInWei - Price in Wei for the supported coin
     * @param expiresAt - Duration of the order (in hours)
     */
-  function createOrder(uint256 assetId, uint256 priceInWei, uint256 expiresAt) public whenNotPaused {
+  function createOrder(
+    uint256 assetId,
+    uint256 priceInWei,
+    uint256 expiresAt
+  )
+    public
+    whenNotPaused
+  {
     _createOrder(
       legacyNFTAddress,
       assetId,
@@ -206,7 +212,7 @@ contract Marketplace is Migratable, Ownable, Pausable, MarketplaceStorage {
       price,
       ""
     );
-    
+
     emit AuctionSuccessful(
       order.id,
       assetId,
@@ -221,7 +227,14 @@ contract Marketplace is Migratable, Ownable, Pausable, MarketplaceStorage {
     * @dev It's equivalent to orderByAssetId[legacyNFTAddress][assetId] but returns same structure as the old Auction
     * @param assetId - ID of the published NFT
     */
-  function auctionByAssetId(uint256 assetId) public view returns (bytes32, address, uint256, uint256) {
+  function auctionByAssetId(
+    uint256 assetId
+  )
+    public
+    view
+    returns
+    (bytes32, address, uint256, uint256)
+  {
     Order memory order = orderByAssetId[legacyNFTAddress][assetId];
     return (order.id, order.seller, order.price, order.expiresAt);
   }
@@ -241,7 +254,7 @@ contract Marketplace is Migratable, Ownable, Pausable, MarketplaceStorage {
   )
     internal
   {
-    require(nftAddress.isContract(), "The NFT Address should be a contract");
+    _requireERC721(nftAddress);
 
     ERC721Interface nftRegistry = ERC721Interface(nftAddress);
     address assetOwner = nftRegistry.ownerOf(assetId);
@@ -333,6 +346,8 @@ contract Marketplace is Migratable, Ownable, Pausable, MarketplaceStorage {
   )
    internal returns (Order)
   {
+    _requireERC721(nftAddress);
+
     ERC721Verifiable nftRegistry = ERC721Verifiable(nftAddress);
 
     if (nftRegistry.supportsInterface(InterfaceId_ValidateFingerprint)) {
@@ -392,5 +407,15 @@ contract Marketplace is Migratable, Ownable, Pausable, MarketplaceStorage {
     );
 
     return order;
+  }
+
+  function _requireERC721(address nftAddress) internal view {
+    require(nftAddress.isContract(), "The NFT Address should be a contract");
+
+    ERC721Interface nftRegistry = ERC721Interface(nftAddress);
+    require(
+      nftRegistry.supportsInterface(ERC721_Interface),
+      "The NFT contract has an invalid ERC721 implementation"
+    );
   }
 }

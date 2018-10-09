@@ -229,9 +229,9 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
       let _market = await Marketplace.new(erc20.address, legacyErc721.address, {
         from: owner
       })
-      let t = await _market.acceptedToken.call()
+      let acceptedToken = await _market.acceptedToken.call()
 
-      t.should.be.equal(erc20.address)
+      acceptedToken.should.be.equal(erc20.address)
     })
 
     it('should revert if token is invalid', async function() {
@@ -552,6 +552,16 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
       })
 
       await executeOrder(erc721.address, assetId, itemPrice, {
+        from: buyer
+      }).should.be.rejectedWith(EVMRevert)
+    })
+
+    it('should fail to execute a created order :: (not an ERC721 contract)', async function() {
+      await createOrder(erc721.address, assetId, itemPrice, endTime, {
+        from: seller
+      })
+      // Not cover it at 100% but we should see it as an upgradeable contract
+      await executeOrder(erc20.address, assetId, itemPrice, {
         from: buyer
       }).should.be.rejectedWith(EVMRevert)
     })
