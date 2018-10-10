@@ -46,7 +46,7 @@ contract MarketplaceStorage {
   // From ERC721 registry assetId to Order (to avoid asset collision)
   mapping (address => mapping(uint256 => Order)) public orderByAssetId;
 
-  uint256 public ownerCutPercentage;
+  uint256 public ownerCutPerMillion;
   uint256 public publicationFeeInWei;
 
   address public legacyNFTAddress;
@@ -82,7 +82,7 @@ contract MarketplaceStorage {
   );
 
   event ChangedPublicationFee(uint256 publicationFee);
-  event ChangedOwnerCutPercentage(uint256 ownerCutPercentage);
+  event ChangedOwnerCutPerMillion(uint256 ownerCutPerMillion);
   event ChangeLegacyNFTAddress(address indexed legacyNFTAddress);
 
   // [LEGACY] Auction events

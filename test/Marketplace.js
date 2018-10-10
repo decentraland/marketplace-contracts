@@ -83,11 +83,11 @@ function checkChangedPublicationFeeLog(log, publicationFee) {
   )
 }
 
-function checkChangedOwnerCutPercentageLog(log, ownerCutPercentage) {
-  log.event.should.be.eq('ChangedOwnerCutPercentage')
-  log.args.ownerCutPercentage.should.be.bignumber.equal(
-    ownerCutPercentage,
-    'ownerCutPercentage'
+function checkChangedOwnerCutPerMillionLog(log, ownerCutPerMillion) {
+  log.event.should.be.eq('ChangedOwnerCutPerMillion')
+  log.args.ownerCutPerMillion.should.be.bignumber.equal(
+    ownerCutPerMillion,
+    'ownerCutPerMillion'
   )
 }
 
@@ -748,38 +748,38 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
     })
   })
 
-  describe('ownerCutPercentage', function() {
+  describe('ownerCutPerMillion', function() {
     it('should be initialized to 0', async function() {
-      const response = await market.ownerCutPercentage()
+      const response = await market.ownerCutPerMillion()
       response.should.be.bignumber.equal(0)
     })
 
     it('should change owner sale cut', async function() {
       const ownerCut = 10
 
-      const { logs } = await market.setOwnerCutPercentage(ownerCut, {
+      const { logs } = await market.setOwnerCutPerMillion(ownerCut, {
         from: owner
       })
-      let response = await market.ownerCutPercentage()
+      let response = await market.ownerCutPerMillion()
       response.should.be.bignumber.equal(ownerCut)
       logs.length.should.be.equal(1)
-      checkChangedOwnerCutPercentageLog(logs[0], ownerCut)
+      checkChangedOwnerCutPerMillionLog(logs[0], ownerCut)
 
-      await market.setOwnerCutPercentage(0, {
+      await market.setOwnerCutPerMillion(0, {
         from: owner
       })
-      response = await market.ownerCutPercentage()
+      response = await market.ownerCutPerMillion()
       response.should.be.bignumber.equal(0)
     })
 
     it('should fail to change owner cut (% invalid above)', async function() {
       await market
-        .setOwnerCutPercentage(100, { from: owner })
+        .setOwnerCutPerMillion(10000000, { from: owner })
         .should.be.rejectedWith(EVMRevert)
 
       // -1 is a uint256 in solidity 1.157920892373162e+77
       await market
-        .setOwnerCutPercentage(-1, { from: owner })
+        .setOwnerCutPerMillion(-1, { from: owner })
         .should.be.rejectedWith(EVMRevert)
     })
 
@@ -787,7 +787,7 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
       const ownerCut = 10
 
       await market
-        .setOwnerCutPercentage(ownerCut, { from: seller })
+        .setOwnerCutPerMillion(ownerCut, { from: seller })
         .should.be.rejectedWith(EVMRevert)
     })
   })
@@ -818,9 +818,9 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
       erc20.setBalance(buyer, web3.toWei(10.0, 'ether'))
       erc20.setBalance(seller, web3.toWei(10.0, 'ether'))
 
-      let ownerCut = 10
+      let ownerCut = 100000
 
-      await market.setOwnerCutPercentage(ownerCut, { from: owner })
+      await market.setOwnerCutPerMillion(ownerCut, { from: owner })
       await createOrder(erc721.address, assetId, itemPrice, endTime, {
         from: seller
       })

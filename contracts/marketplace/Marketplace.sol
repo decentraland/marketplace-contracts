@@ -25,13 +25,13 @@ contract Marketplace is Migratable, Ownable, Pausable, MarketplaceStorage {
   /**
     * @dev Sets the share cut for the owner of the contract that's
     *  charged to the seller on a successful sale
-    * @param _ownerCutPercentage - Share amount, from 0 to 99
+    * @param _ownerCutPerMillion - Share amount, from 0 to 999,999
     */
-  function setOwnerCutPercentage(uint256 _ownerCutPercentage) external onlyOwner {
-    require(_ownerCutPercentage < 100, "The owner cut should be between 0 and 99");
+  function setOwnerCutPerMillion(uint256 _ownerCutPerMillion) external onlyOwner {
+    require(_ownerCutPerMillion < 1000000, "The owner cut should be between 0 and 999,999");
 
-    ownerCutPercentage = _ownerCutPercentage;
-    emit ChangedOwnerCutPercentage(ownerCutPercentage);
+    ownerCutPerMillion = _ownerCutPerMillion;
+    emit ChangedOwnerCutPerMillion(ownerCutPerMillion);
   }
 
   /**
@@ -61,8 +61,8 @@ contract Marketplace is Migratable, Ownable, Pausable, MarketplaceStorage {
 
     // msg.sender is the App contract not the real owner. Calls ownable behind the scenes...sigh
     require(_owner != address(0), "Invalid owner");
-    Pausable.initialize(_owner); 
-    
+    Pausable.initialize(_owner);
+
     require(_acceptedToken.isContract(), "The accepted token address must be a deployed contract");
     acceptedToken = ERC20Interface(_acceptedToken);
 
@@ -267,7 +267,7 @@ contract Marketplace is Migratable, Ownable, Pausable, MarketplaceStorage {
       "The contract is not authorized to manage the asset"
     );
     require(priceInWei > 0, "Price should be bigger than 0");
-    require(expiresAt > block.timestamp.add(1 minutes), "Expires should be bigger than 1 minute");
+    require(expiresAt > block.timestamp.add(1 minutes), "Publication should be more than 1 minute in the future");
 
     bytes32 orderId = keccak256(
       abi.encodePacked(
@@ -375,9 +375,9 @@ contract Marketplace is Migratable, Ownable, Pausable, MarketplaceStorage {
     bytes32 orderId = order.id;
     delete orderByAssetId[nftAddress][assetId];
 
-    if (ownerCutPercentage > 0) {
+    if (ownerCutPerMillion > 0) {
       // Calculate sale share
-      saleShareAmount = price.mul(ownerCutPercentage).div(100);
+      saleShareAmount = price.mul(ownerCutPerMillion).div(1000000);
 
       // Transfer share amount for marketplace Owner
       require(
