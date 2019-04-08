@@ -21,10 +21,6 @@ jobs:
           name: Install packages
           command: npm install
 
-      - run:
-          name: Compile contracts
-          command: npm run compile
-
       - save_cache:
           paths:
             - node_modules
@@ -53,10 +49,10 @@ jobs:
           name: Install packages
           command: npm install
 
-      # Compile contracts!
+      # Compile contracts
       - run:
           name: Compile contracts
-          command: truffle compile
+          command: npm run compile
 
       - run:
           name: Semantic release
