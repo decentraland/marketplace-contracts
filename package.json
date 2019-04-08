@@ -24,7 +24,8 @@
     "lint": "npx solium -d contracts",
     "lint:fix": "npx solium -d contracts --fix",
     "semantic-release": "semantic-release",
-    "commit-msg": "validate-commit-msg"
+    "commit-msg": "validate-commit-msg",
+    "compile": "truffle compile"
   },
   "author": "Decentraland",
   "license": "ISC",
