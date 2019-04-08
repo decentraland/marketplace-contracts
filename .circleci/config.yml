@@ -13,9 +13,9 @@ jobs:
       # Download and cache dependencies
       - restore_cache:
           keys:
-          - v1-dependencies-{{ checksum "package-lock.json" }}
-          # fallback to using the latest cache if no exact match is found
-          - v1-dependencies-
+            - v1-dependencies-{{ checksum "package-lock.json" }}
+            # fallback to using the latest cache if no exact match is found
+            - v1-dependencies-
 
       - run:
           name: Install packages
@@ -25,8 +25,48 @@ jobs:
           paths:
             - node_modules
           key: v1-dependencies-{{ checksum "package-lock.json" }}
-        
+
       # run tests!
-      - run: 
+      - run:
           name: Run tests
           command: npm run test
+  release:
+    docker:
+      # specify the version you desire here
+      - image: circleci/node:10.2-stretch
+
+    working_directory: ~/repo
+
+    steps:
+      - checkout
+      - restore_cache:
+          keys:
+            - v1-dependencies-{{ checksum "package-lock.json" }}
+            # fallback to using the latest cache if no exact match is found
+            - v1-dependencies-
+
+      - run:
+          name: Install packages
+          command: npm install
+
+      # Compile contracts!
+      - run:
+          name: Compile contracts
+          command: truffle compile
+
+      - run:
+          name: Semantic release
+          command: npm run semantic-release
+
+workflows:
+  version: 2
+  test-build-release:
+    jobs:
+      - build
+      - release:
+          requires:
+            - build
+          filters:
+            branches:
+              only:
+                - master
