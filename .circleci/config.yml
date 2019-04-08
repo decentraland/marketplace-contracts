@@ -21,6 +21,10 @@ jobs:
           name: Install packages
           command: npm install
 
+      - run:
+          name: Install truffle globally
+          command: npm install -g truffle@4.1.14 && truffle compile
+
       - save_cache:
           paths:
             - node_modules
