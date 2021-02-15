@@ -33,7 +33,7 @@
     "lint:fix": "npx solium -d contracts --fix",
     "semantic-release": "semantic-release",
     "commit-msg": "validate-commit-msg",
-    "compile": "truffle compile"
+    "compile": "npx hardhat compile"
   },
   "author": "Decentraland",
   "license": "ISC",
