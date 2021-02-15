@@ -16,7 +16,6 @@ const Marketplace = artifacts.require('MarketplaceTest')
 const ERC20Token = artifacts.require('ERC20Test')
 const ERC721Token = artifacts.require('ERC721Test')
 const VerfiableERC721Token = artifacts.require('VerifiableERC721Test')
-const LegacyERC721 = artifacts.require('LegacyERC721')
 
 const { increaseTime, duration } = require('./helpers/increaseTime')
 const { sendMetaTx } = require('./helpers/metaTx')
@@ -106,11 +105,6 @@ function checkChangedOwnerCutPerMillionLog(log, ownerCutPerMillion) {
   )
 }
 
-function checkSetLegacyNFTAddressLog(log, nftAddress) {
-  log.event.should.be.equal('ChangeLegacyNFTAddress')
-  log.args.legacyNFTAddress.should.be.equal(nftAddress, 'nftAddress')
-}
-
 async function getEndTime(minutesAhead = 15) {
   const block = await web3.eth.getBlock('latest')
   return block.timestamp + duration.minutes(minutesAhead)
@@ -135,7 +129,6 @@ contract('Marketplace', function([
   let erc20
   let erc721
   let verifiableErc721
-  let legacyErc721
 
   let fingerprint
   let endTime
@@ -158,16 +151,6 @@ contract('Marketplace', function([
   }
   async function cancelOrder(...params) {
     return callMethod('cancelOrder', 'address,uint256', params)
-  }
-
-  async function createOrderLegacy(...params) {
-    return callMethod('createOrder', 'uint256,uint256,uint256', params)
-  }
-  async function executeOrderLegacy(...params) {
-    return callMethod('executeOrder', 'uint256,uint256', params)
-  }
-  async function cancelOrderLegacy(...params) {
-    return callMethod('cancelOrder', 'uint256', params)
   }
 
   // Makeshift method to support solidity overloads ( https://github.com/trufflesuite/truffle/issues/737 ):
@@ -216,10 +199,9 @@ contract('Marketplace', function([
       'DCL',
       creationParams
     )
-    legacyErc721 = await LegacyERC721.new('OLDLAND', 'OLDDCL', creationParams)
 
     // Create a Marketplace with mocks
-    market = await Marketplace.new(erc20.address, legacyErc721.address, owner, {
+    market = await Marketplace.new(erc20.address, 0, owner, {
       from: owner,
     })
 
@@ -236,9 +218,6 @@ contract('Marketplace', function([
     await verifiableErc721.setApprovalForAll(market.address, true, {
       from: buyer,
     })
-
-    await legacyErc721.mint(seller, assetId)
-    await legacyErc721.setApprovalForAll(market.address, true, { from: seller })
 
     // Assign balance to buyer and allow marketplace to move ERC20
     await erc20.setBalance(buyer, web3.utils.toWei('10', 'ether'))
@@ -257,31 +236,28 @@ contract('Marketplace', function([
 
   describe('Initialize', function() {
     it('should initialize with token', async function() {
-      let _market = await Marketplace.new(
-        erc20.address,
-        legacyErc721.address,
-        owner,
-        { from: owner }
-      )
+      let _market = await Marketplace.new(erc20.address, 0, owner, {
+        from: owner,
+      })
       let acceptedToken = await _market.acceptedToken.call()
 
       acceptedToken.should.be.equal(erc20.address)
     })
 
     it('should revert if token is invalid', async function() {
-      await Marketplace.new(zeroAddress, legacyErc721.address, owner, {
+      await Marketplace.new(zeroAddress, 0, owner, {
         from: owner,
       }).should.be.rejectedWith(EVMRevert)
     })
 
-    it('should revert if nft address is invalid', async function() {
-      await Marketplace.new(erc20.address, zeroAddress, owner, {
+    it('should revert if fee is invalid address is invalid', async function() {
+      await Marketplace.new(erc20.address, 1000000, owner, {
         from: owner,
       }).should.be.rejectedWith(EVMRevert)
     })
 
     it('should revert if owner is invalid', async function() {
-      await Marketplace.new(erc20.address, legacyErc721.address, zeroAddress, {
+      await Marketplace.new(erc20.address, 0, zeroAddress, {
         from: owner,
       }).should.be.rejectedWith(EVMRevert)
     })
@@ -565,92 +541,6 @@ contract('Marketplace', function([
         })
         .should.be.rejectedWith(EVMRevert)
     })
-
-    it('[LEGACY] should create a new order', async function() {
-      const { logs } = await createOrderLegacy(assetId, itemPrice, endTime, {
-        from: seller,
-      })
-
-      // Event emitted
-      logs.length.should.be.equal(2)
-      checkOrderCreatedLogs(
-        logs,
-        assetId,
-        seller,
-        legacyErc721.address,
-        itemPrice,
-        endTime
-      )
-
-      // Check data
-      let s = await market.auctionByAssetId(assetId)
-      s[1].should.be.equal(seller)
-      s[2].should.be.eq.BN(itemPrice)
-      s[3].should.be.eq.BN(endTime)
-    })
-
-    it('[LEGACY] should create a new order :: Relayed EIP721', async function() {
-      const functionSignature = web3.eth.abi.encodeFunctionCall(
-        {
-          inputs: [
-            {
-              internalType: 'uint256',
-              name: 'assetId',
-              type: 'uint256',
-            },
-            {
-              internalType: 'uint256',
-              name: 'priceInWei',
-              type: 'uint256',
-            },
-            {
-              internalType: 'uint256',
-              name: 'expiresAt',
-              type: 'uint256',
-            },
-          ],
-          name: 'createOrder',
-          outputs: [],
-          stateMutability: 'nonpayable',
-          type: 'function',
-        },
-        [assetId, itemPrice, endTime]
-      )
-
-      const { logs } = await sendMetaTx(
-        market,
-        functionSignature,
-        seller,
-        relayer,
-        null,
-        domain,
-        version
-      )
-
-      logs.length.should.be.equal(3)
-      logs.shift()
-
-      checkOrderCreatedLogs(
-        logs,
-        assetId,
-        seller,
-        legacyErc721.address,
-        itemPrice,
-        endTime
-      )
-
-      // Check data
-      let s = await market.auctionByAssetId(assetId)
-      s[1].should.be.equal(seller)
-      s[2].should.be.eq.BN(itemPrice)
-      s[3].should.be.eq.BN(endTime)
-    })
-
-    it('[LEGACY] should fail to create a new order with a not legacy token', async function() {
-      await createOrderLegacy(notLegacyAssetId, itemPrice, endTime, {
-        from: seller,
-      }).should.be.rejectedWith(EVMRevert)
-    })
   })
 
   describe('Cancel', function() {
@@ -826,107 +716,6 @@ contract('Marketplace', function([
         from: seller,
       }).should.be.rejectedWith(EVMRevert)
     })
-
-    it('[LEGACY] should let the seller cancel a created order', async function() {
-      await createOrder(legacyErc721.address, assetId, itemPrice, endTime, {
-        from: seller,
-      })
-      const { logs } = await cancelOrderLegacy(assetId, { from: seller })
-
-      // Event emitted
-      logs.length.should.be.equal(2)
-      checkOrderCancelledLogs(logs, assetId, seller, legacyErc721.address)
-    })
-
-    it('[LEGACY] should let the seller cancel a created order :: Relayed EIP721', async function() {
-      await createOrder(legacyErc721.address, assetId, itemPrice, endTime, {
-        from: seller,
-      })
-
-      const functionSignature = web3.eth.abi.encodeFunctionCall(
-        {
-          inputs: [
-            {
-              internalType: 'uint256',
-              name: 'assetId',
-              type: 'uint256',
-            },
-          ],
-          name: 'cancelOrder',
-          outputs: [],
-          stateMutability: 'nonpayable',
-          type: 'function',
-        },
-        [assetId]
-      )
-
-      const { logs } = await sendMetaTx(
-        market,
-        functionSignature,
-        seller,
-        relayer,
-        null,
-        domain,
-        version
-      )
-
-      logs.length.should.be.equal(3)
-      logs.shift()
-      checkOrderCancelledLogs(logs, assetId, seller, legacyErc721.address)
-    })
-
-    it('[LEGACY] should let the seller cancel a created legacy order', async function() {
-      await createOrderLegacy(assetId, itemPrice, endTime, { from: seller })
-      const { logs } = await cancelOrderLegacy(assetId, { from: seller })
-
-      // Event emitted
-      logs.length.should.be.equal(2)
-      checkOrderCancelledLogs(logs, assetId, seller, legacyErc721.address)
-    })
-
-    it('[LEGACY] should let the seller cancel a created legacy order :: Relayed EIP721', async function() {
-      await createOrderLegacy(assetId, itemPrice, endTime, { from: seller })
-
-      const functionSignature = web3.eth.abi.encodeFunctionCall(
-        {
-          inputs: [
-            {
-              internalType: 'uint256',
-              name: 'assetId',
-              type: 'uint256',
-            },
-          ],
-          name: 'cancelOrder',
-          outputs: [],
-          stateMutability: 'nonpayable',
-          type: 'function',
-        },
-        [assetId]
-      )
-
-      const { logs } = await sendMetaTx(
-        market,
-        functionSignature,
-        owner,
-        relayer,
-        null,
-        domain,
-        version
-      )
-
-      logs.length.should.be.equal(3)
-      logs.shift()
-      checkOrderCancelledLogs(logs, assetId, seller, legacyErc721.address)
-    })
-
-    it('[LEGACY] should not let the seller of a not legacy token to cancel a created order', async function() {
-      await createOrder(erc721.address, assetId, itemPrice, endTime, {
-        from: seller,
-      })
-      await cancelOrderLegacy(assetId, {
-        from: seller,
-      }).should.be.rejectedWith(EVMRevert)
-    })
   })
 
   describe('Execute', function() {
@@ -1048,149 +837,6 @@ contract('Marketplace', function([
       await createOrder(erc721.address, assetId, itemPrice, endTime, {
         from: seller,
       })
-    })
-
-    it('[LEGACY] should execute a created order', async function() {
-      await createOrder(legacyErc721.address, assetId, itemPrice, endTime, {
-        from: seller,
-      })
-      const { logs } = await executeOrderLegacy(assetId, itemPrice, {
-        from: buyer,
-      })
-
-      // Event emitted
-      logs.length.should.be.equal(2)
-      checkOrderSuccessfulLogs(
-        logs,
-        assetId,
-        seller,
-        legacyErc721.address,
-        itemPrice,
-        buyer
-      )
-    })
-
-    it('[LEGACY] should execute a created order :: Relayed EIP721', async function() {
-      await createOrder(legacyErc721.address, assetId, itemPrice, endTime, {
-        from: seller,
-      })
-
-      const functionSignature = web3.eth.abi.encodeFunctionCall(
-        {
-          inputs: [
-            {
-              internalType: 'uint256',
-              name: 'assetId',
-              type: 'uint256',
-            },
-            {
-              internalType: 'uint256',
-              name: 'price',
-              type: 'uint256',
-            },
-          ],
-          name: 'executeOrder',
-          outputs: [],
-          stateMutability: 'nonpayable',
-          type: 'function',
-        },
-        [assetId, itemPrice]
-      )
-
-      const { logs } = await sendMetaTx(
-        market,
-        functionSignature,
-        buyer,
-        relayer,
-        null,
-        domain,
-        version
-      )
-
-      logs.length.should.be.equal(3)
-      logs.shift()
-      checkOrderSuccessfulLogs(
-        logs,
-        assetId,
-        seller,
-        legacyErc721.address,
-        itemPrice,
-        buyer
-      )
-    })
-
-    it('[LEGACY] should execute a created legacy order', async function() {
-      await createOrderLegacy(assetId, itemPrice, endTime, { from: seller })
-      const { logs } = await executeOrderLegacy(assetId, itemPrice, {
-        from: buyer,
-      })
-
-      // Event emitted
-      logs.length.should.be.equal(2)
-      checkOrderSuccessfulLogs(
-        logs,
-        assetId,
-        seller,
-        legacyErc721.address,
-        itemPrice,
-        buyer
-      )
-    })
-
-    it('[LEGACY] should execute a created legacy order :: Relayed EIP721', async function() {
-      await createOrderLegacy(assetId, itemPrice, endTime, { from: seller })
-
-      const functionSignature = web3.eth.abi.encodeFunctionCall(
-        {
-          inputs: [
-            {
-              internalType: 'uint256',
-              name: 'assetId',
-              type: 'uint256',
-            },
-            {
-              internalType: 'uint256',
-              name: 'price',
-              type: 'uint256',
-            },
-          ],
-          name: 'executeOrder',
-          outputs: [],
-          stateMutability: 'nonpayable',
-          type: 'function',
-        },
-        [assetId, itemPrice]
-      )
-
-      const { logs } = await sendMetaTx(
-        market,
-        functionSignature,
-        buyer,
-        relayer,
-        null,
-        domain,
-        version
-      )
-
-      logs.length.should.be.equal(3)
-      logs.shift()
-      checkOrderSuccessfulLogs(
-        logs,
-        assetId,
-        seller,
-        legacyErc721.address,
-        itemPrice,
-        buyer
-      )
-    })
-
-    it('[LEGACY] should not execute a created order for a not legacy token', async function() {
-      await createOrder(erc721.address, assetId, itemPrice, endTime, {
-        from: seller,
-      })
-      await executeOrderLegacy(assetId, itemPrice, {
-        from: buyer,
-      }).should.be.rejectedWith(EVMRevert)
     })
   })
 
@@ -1739,98 +1385,6 @@ contract('Marketplace', function([
 
       let buyerBalance = await erc20.balanceOf(buyer)
       buyerBalance.should.be.eq.BN(web3.utils.toWei('9.0', 'ether'))
-    })
-  })
-
-  describe('Legacy auctionByAssetId', function() {
-    it('should return the order of a published nft with the old Auction structure', async function() {
-      await createOrderLegacy(assetId, itemPrice, endTime, { from: seller })
-      const res = await market.auctionByAssetId(assetId)
-
-      const orderSeller = res['1']
-      const orderPrice = res['2']
-      const orderExpiresAt = res['3']
-
-      orderSeller.should.be.equal(seller, 'seller')
-      orderPrice.should.be.eq.BN(itemPrice, 'itemPrice')
-      orderExpiresAt.should.be.eq.BN(endTime, 'expiresAt')
-    })
-
-    it('should get legacy token with order getter', async function() {
-      await createOrderLegacy(assetId, itemPrice, endTime, {
-        from: seller,
-      })
-
-      let s = await market.orderByAssetId.call(legacyErc721.address, assetId)
-      s[1].should.be.equal(seller)
-      s[2].should.be.equal(legacyErc721.address)
-      s[3].should.be.eq.BN(itemPrice)
-      s[4].should.be.eq.BN(endTime)
-    })
-
-    it('should get legacy token with order legacy getter', async function() {
-      await createOrder(legacyErc721.address, assetId, itemPrice, endTime, {
-        from: seller,
-      })
-
-      // Check data
-      let s = await market.auctionByAssetId(assetId)
-      s[1].should.be.equal(seller)
-      s[2].should.be.eq.BN(itemPrice)
-      s[3].should.be.eq.BN(endTime)
-    })
-
-    it('should not get not legacy token with order legacy getter', async function() {
-      await createOrder(erc721.address, assetId, itemPrice, endTime, {
-        from: seller,
-      })
-
-      // Check data
-      let s = await market.auctionByAssetId(assetId)
-      s[1].should.be.equal(zeroAddress)
-      s[2].should.be.eq.BN(0)
-      s[3].should.be.eq.BN(0)
-    })
-  })
-
-  describe('setLegacyNFTAddress', function() {
-    it('should return the legacy nft address', async function() {
-      const address = await market.legacyNFTAddress()
-      address.should.be.equal(legacyErc721.address)
-    })
-
-    it('should change the legacy nft address', async function() {
-      let address = await market.legacyNFTAddress()
-      address.should.be.equal(legacyErc721.address)
-
-      const { logs } = await market.setLegacyNFTAddress(
-        erc721.address,
-        fromOwner
-      )
-
-      // Event emitted
-      logs.length.should.be.equal(1)
-      checkSetLegacyNFTAddressLog(logs[0], erc721.address)
-      address = await market.legacyNFTAddress()
-      address.should.be.equal(erc721.address)
-    })
-
-    it('should rever if not the owner try to change the legacy nft address', async function() {
-      await market
-        .setLegacyNFTAddress(erc721.address)
-        .should.be.rejectedWith(EVMRevert)
-    })
-
-    it('should revert when changing legacy nft address with an invalid contract address', async function() {
-      let address = await market.legacyNFTAddress()
-      address.should.be.equal(legacyErc721.address)
-
-      await market
-        .setLegacyNFTAddress(zeroAddress, fromOwner)
-        .should.be.rejectedWith(EVMRevert)
-
-      address = await market.legacyNFTAddress()
-      address.should.be.equal(legacyErc721.address)
     })
   })
 })

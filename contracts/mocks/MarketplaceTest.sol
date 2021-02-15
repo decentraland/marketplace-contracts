@@ -6,11 +6,11 @@ import "../../contracts/marketplace/Marketplace.sol";
 contract MarketplaceTest is Marketplace {
   constructor (
     address _acceptedToken,
-    address _legacyNFTAddress,
+    uint256 _fee,
     address _owner
   ) Marketplace(
     _acceptedToken,
-    _legacyNFTAddress,
+    _fee,
     _owner
   ) {
 

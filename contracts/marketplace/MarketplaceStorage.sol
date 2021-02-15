@@ -49,8 +49,6 @@ contract MarketplaceStorage {
   uint256 public ownerCutPerMillion;
   uint256 public publicationFeeInWei;
 
-  address public legacyNFTAddress;
-
   bytes4 public constant InterfaceId_ValidateFingerprint = bytes4(
     keccak256("verifyFingerprint(uint256,bytes)")
   );
@@ -83,26 +81,4 @@ contract MarketplaceStorage {
 
   event ChangedPublicationFee(uint256 publicationFee);
   event ChangedOwnerCutPerMillion(uint256 ownerCutPerMillion);
-  event ChangeLegacyNFTAddress(address indexed legacyNFTAddress);
-
-  // [LEGACY] Auction events
-  event AuctionCreated(
-    bytes32 id,
-    uint256 indexed assetId,
-    address indexed seller,
-    uint256 priceInWei,
-    uint256 expiresAt
-  );
-  event AuctionSuccessful(
-    bytes32 id,
-    uint256 indexed assetId,
-    address indexed seller,
-    uint256 totalPrice,
-    address indexed winner
-  );
-  event AuctionCancelled(
-    bytes32 id,
-    uint256 indexed assetId,
-    address indexed seller
-  );
 }

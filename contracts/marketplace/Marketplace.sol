@@ -17,11 +17,12 @@ contract Marketplace is Ownable, Pausable, MarketplaceStorage, NativeMetaTransac
   /**
     * @dev Initialize this contract. Acts as a constructor
     * @param _acceptedToken - Address of the ERC20 accepted for this marketplace
-    * @param _legacyNFTAddress - Address of the NFT address used for legacy methods that don't have nftAddress as parameter
+    * @param _ownerCutPerMillion - owner cut per million
+
     */
   constructor (
     address _acceptedToken,
-    address _legacyNFTAddress,
+    uint256 _ownerCutPerMillion,
     address _owner
   )
     public
@@ -29,14 +30,14 @@ contract Marketplace is Ownable, Pausable, MarketplaceStorage, NativeMetaTransac
     // EIP712 init
     _initializeEIP712('Decentraland Marketplace', '1');
 
+    // Fee init
+    setOwnerCutPerMillion(_ownerCutPerMillion);
+
     require(_owner != address(0), "Invalid owner");
     transferOwnership(_owner);
 
     require(_acceptedToken.isContract(), "The accepted token address must be a deployed contract");
     acceptedToken = ERC20Interface(_acceptedToken);
-
-    _requireERC721(_legacyNFTAddress);
-    legacyNFTAddress = _legacyNFTAddress;
   }
 
 
@@ -54,22 +55,11 @@ contract Marketplace is Ownable, Pausable, MarketplaceStorage, NativeMetaTransac
     *  charged to the seller on a successful sale
     * @param _ownerCutPerMillion - Share amount, from 0 to 999,999
     */
-  function setOwnerCutPerMillion(uint256 _ownerCutPerMillion) external onlyOwner {
+  function setOwnerCutPerMillion(uint256 _ownerCutPerMillion) public onlyOwner {
     require(_ownerCutPerMillion < 1000000, "The owner cut should be between 0 and 999,999");
 
     ownerCutPerMillion = _ownerCutPerMillion;
     emit ChangedOwnerCutPerMillion(ownerCutPerMillion);
-  }
-
-  /**
-    * @dev Sets the legacy NFT address to be used
-    * @param _legacyNFTAddress - Address of the NFT address used for legacy methods that don't have nftAddress as parameter
-    */
-  function setLegacyNFTAddress(address _legacyNFTAddress) external onlyOwner {
-    _requireERC721(_legacyNFTAddress);
-
-    legacyNFTAddress = _legacyNFTAddress;
-    emit ChangeLegacyNFTAddress(legacyNFTAddress);
   }
 
   /**
@@ -97,37 +87,6 @@ contract Marketplace is Ownable, Pausable, MarketplaceStorage, NativeMetaTransac
   }
 
   /**
-    * @dev [LEGACY] Creates a new order
-    * @param assetId - ID of the published NFT
-    * @param priceInWei - Price in Wei for the supported coin
-    * @param expiresAt - Duration of the order (in hours)
-    */
-  function createOrder(
-    uint256 assetId,
-    uint256 priceInWei,
-    uint256 expiresAt
-  )
-    public
-    whenNotPaused
-  {
-    _createOrder(
-      legacyNFTAddress,
-      assetId,
-      priceInWei,
-      expiresAt
-    );
-
-    Order memory order = orderByAssetId[legacyNFTAddress][assetId];
-    emit AuctionCreated(
-      order.id,
-      assetId,
-      order.seller,
-      order.price,
-      order.expiresAt
-    );
-  }
-
-  /**
     * @dev Cancel an already published order
     *  can only be canceled by seller or the contract owner
     * @param nftAddress - Address of the NFT registry
@@ -135,21 +94,6 @@ contract Marketplace is Ownable, Pausable, MarketplaceStorage, NativeMetaTransac
     */
   function cancelOrder(address nftAddress, uint256 assetId) public whenNotPaused {
     _cancelOrder(nftAddress, assetId);
-  }
-
-  /**
-    * @dev [LEGACY] Cancel an already published order
-    *  can only be canceled by seller or the contract owner
-    * @param assetId - ID of the published NFT
-    */
-  function cancelOrder(uint256 assetId) public whenNotPaused {
-    Order memory order = _cancelOrder(legacyNFTAddress, assetId);
-
-    emit AuctionCancelled(
-      order.id,
-      assetId,
-      order.seller
-    );
   }
 
   /**
@@ -196,51 +140,6 @@ contract Marketplace is Ownable, Pausable, MarketplaceStorage, NativeMetaTransac
       price,
       ""
     );
-  }
-
-  /**
-    * @dev [LEGACY] Executes the sale for a published NFT
-    * @param assetId - ID of the published NFT
-    * @param price - Order price
-    */
-  function executeOrder(
-    uint256 assetId,
-    uint256 price
-  )
-   public
-   whenNotPaused
-  {
-    Order memory order = _executeOrder(
-      legacyNFTAddress,
-      assetId,
-      price,
-      ""
-    );
-
-    emit AuctionSuccessful(
-      order.id,
-      assetId,
-      order.seller,
-      price,
-      _msgSender()
-    );
-  }
-
-  /**
-    * @dev [LEGACY] Gets an order using the legacy NFT address.
-    * @dev It's equivalent to orderByAssetId[legacyNFTAddress][assetId] but returns same structure as the old Auction
-    * @param assetId - ID of the published NFT
-    */
-  function auctionByAssetId(
-    uint256 assetId
-  )
-    public
-    view
-    returns
-    (bytes32, address, uint256, uint256)
-  {
-    Order memory order = orderByAssetId[legacyNFTAddress][assetId];
-    return (order.id, order.seller, order.price, order.expiresAt);
   }
 
   /**
