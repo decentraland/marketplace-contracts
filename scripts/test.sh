@@ -50,4 +50,4 @@ else
   start_ganache
 fi
 
-node_modules/.bin/truffle test "$@"
+npx hardhat test
