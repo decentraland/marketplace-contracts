@@ -5,6 +5,9 @@ require('chai')
   .use(require('chai-bignumber')(BigNumber))
   .should()
 
+const BN = web3.utils.BN
+const expect = require('chai').use(require('bn-chai')(BN)).expect
+
 const abiDecoder = require('abi-decoder')
 
 const EVMRevert = 'VM Exception while processing transaction: revert'
@@ -16,6 +19,7 @@ const VerfiableERC721Token = artifacts.require('VerifiableERC721Test')
 const LegacyERC721 = artifacts.require('LegacyERC721')
 
 const { increaseTime, duration } = require('./helpers/increaseTime')
+const { sendMetaTx } = require('./helpers/metaTx')
 
 function checkOrderCreatedLogs(
   logs,
@@ -27,28 +31,36 @@ function checkOrderCreatedLogs(
 ) {
   logs.forEach((log, index) => {
     if (index === 0) {
-      log.event.should.be.eq('OrderCreated')
-      log.args.nftAddress.should.be.equal(nftAddress, 'nftAddress')
+      log.event.should.be.equal('OrderCreated')
+      log.args.nftAddress
+        .toLowerCase()
+        .should.be.equal(nftAddress.toLowerCase(), 'nftAddress')
     } else {
-      log.event.should.be.eq('AuctionCreated')
+      log.event.should.be.equal('AuctionCreated')
     }
-    log.args.assetId.should.be.bignumber.equal(assetId, 'assetId')
-    log.args.seller.should.be.equal(seller, 'seller')
-    log.args.priceInWei.should.be.bignumber.equal(priceInWei, 'priceInWei')
-    log.args.expiresAt.should.be.bignumber.equal(expiresAt, 'expiresAt')
+    log.args.assetId.should.be.eq.BN(assetId, 'assetId')
+    log.args.seller
+      .toLowerCase()
+      .should.be.equal(seller.toLowerCase(), 'seller')
+    log.args.priceInWei.should.be.eq.BN(priceInWei, 'priceInWei')
+    log.args.expiresAt.should.be.eq.BN(expiresAt, 'expiresAt')
   })
 }
 
 function checkOrderCancelledLogs(logs, assetId, seller, nftAddress) {
   logs.forEach((log, index) => {
     if (index === 0) {
-      log.event.should.be.eq('OrderCancelled')
-      log.args.nftAddress.should.be.equal(nftAddress, 'nftAddress')
+      log.event.should.be.equal('OrderCancelled')
+      log.args.nftAddress
+        .toLowerCase()
+        .should.be.equal(nftAddress.toLowerCase(), 'nftAddress')
     } else {
-      log.event.should.be.eq('AuctionCancelled')
+      log.event.should.be.equal('AuctionCancelled')
     }
-    log.args.assetId.should.be.bignumber.equal(assetId, 'assetId')
-    log.args.seller.should.be.equal(seller, 'seller')
+    log.args.assetId.should.be.eq.BN(assetId, 'assetId')
+    log.args.seller
+      .toLowerCase()
+      .should.be.equal(seller.toLowerCase(), 'seller')
   })
 }
 
@@ -62,49 +74,62 @@ function checkOrderSuccessfulLogs(
 ) {
   logs.forEach((log, index) => {
     if (index === 0) {
-      log.event.should.be.eq('OrderSuccessful')
-      log.args.nftAddress.should.be.equal(nftAddress, 'nftAddress')
-      log.args.buyer.should.be.equal(buyer, 'buyer')
+      log.event.should.be.equal('OrderSuccessful')
+      log.args.nftAddress
+        .toLowerCase()
+        .should.be.equal(nftAddress.toLowerCase(), 'nftAddress')
+      log.args.buyer.toLowerCase().should.be.equal(buyer.toLowerCase(), 'buyer')
     } else {
-      log.event.should.be.eq('AuctionSuccessful')
-      log.args.winner.should.be.equal(buyer, 'buyer')
+      log.event.should.be.equal('AuctionSuccessful')
+      log.args.winner
+        .toLowerCase()
+        .should.be.equal(buyer.toLowerCase(), 'buyer')
     }
-    log.args.assetId.should.be.bignumber.equal(assetId, 'assetId')
-    log.args.seller.should.be.equal(seller, 'seller')
-    log.args.totalPrice.should.be.bignumber.equal(totalPrice, 'totalPrice')
+    log.args.assetId.should.be.eq.BN(assetId, 'assetId')
+    log.args.seller
+      .toLowerCase()
+      .should.be.equal(seller.toLowerCase(), 'seller')
+    log.args.totalPrice.should.be.eq.BN(totalPrice, 'totalPrice')
   })
 }
 
 function checkChangedPublicationFeeLog(log, publicationFee) {
-  log.event.should.be.eq('ChangedPublicationFee')
-  log.args.publicationFee.should.be.bignumber.equal(
-    publicationFee,
-    'publicationFee'
-  )
+  log.event.should.be.equal('ChangedPublicationFee')
+  log.args.publicationFee.should.be.eq.BN(publicationFee, 'publicationFee')
 }
 
 function checkChangedOwnerCutPerMillionLog(log, ownerCutPerMillion) {
-  log.event.should.be.eq('ChangedOwnerCutPerMillion')
-  log.args.ownerCutPerMillion.should.be.bignumber.equal(
+  log.event.should.be.equal('ChangedOwnerCutPerMillion')
+  log.args.ownerCutPerMillion.should.be.eq.BN(
     ownerCutPerMillion,
     'ownerCutPerMillion'
   )
 }
 
 function checkSetLegacyNFTAddressLog(log, nftAddress) {
-  log.event.should.be.eq('ChangeLegacyNFTAddress')
+  log.event.should.be.equal('ChangeLegacyNFTAddress')
   log.args.legacyNFTAddress.should.be.equal(nftAddress, 'nftAddress')
 }
 
-function getEndTime(minutesAhead = 15) {
-  return web3.eth.getBlock('latest').timestamp + duration.minutes(minutesAhead)
+async function getEndTime(minutesAhead = 15) {
+  const block = await web3.eth.getBlock('latest')
+  return block.timestamp + duration.minutes(minutesAhead)
 }
 
-contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
-  const itemPrice = web3.toWei(1.0, 'ether')
+contract('Marketplace', function([
+  _,
+  owner,
+  seller,
+  buyer,
+  otherAddress,
+  relayer,
+]) {
+  const itemPrice = web3.utils.toWei('1', 'ether')
   const assetId = 10000
   const notLegacyAssetId = 2
   const zeroAddress = '0x0000000000000000000000000000000000000000'
+  const domain = 'Decentraland Marketplace'
+  const version = '1'
 
   let market
   let erc20
@@ -112,16 +137,17 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
   let verifiableErc721
   let legacyErc721
 
+  let fingerprint
   let endTime
 
   const fromOwner = {
-    from: owner
+    from: owner,
   }
 
   const creationParams = {
     ...fromOwner,
     gas: 6e6,
-    gasPrice: 21e9
+    gasPrice: 21e9,
   }
 
   async function createOrder(...params) {
@@ -160,29 +186,30 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
       params.push({ gas: 6e6, gasPrice: 21e9 })
     }
 
-    const txHash = await market.contract[methodName][argTypes](...params)
+    const { tx } = await market.methods[`${methodName}(${argTypes})`](...params)
     const receipt = await new Promise((resolve, reject) =>
-      web3.eth.getTransactionReceipt(
-        txHash,
-        (err, data) => (err ? reject(err) : resolve(data))
+      web3.eth.getTransactionReceipt(tx, (err, data) =>
+        err ? reject(err) : resolve(data)
       )
     )
 
     const decodedLogs = abiDecoder.decodeLogs(receipt.logs)
-    receipt.logs = decodedLogs.filter(log => !!log).map(log => ({
-      event: log.name,
-      args: log.events.reduce(
-        (args, arg) => ({ ...args, [arg.name]: arg.value }),
-        {}
-      )
-    }))
+    receipt.logs = decodedLogs
+      .filter((log) => !!log)
+      .map((log) => ({
+        event: log.name,
+        args: log.events.reduce(
+          (args, arg) => ({ ...args, [arg.name]: arg.value }),
+          {}
+        ),
+      }))
 
     return receipt
   }
 
   beforeEach(async function() {
     // Create tokens
-    erc20 = await ERC20Token.new(creationParams)
+    erc20 = await ERC20Token.new('Mana', 'MANA', creationParams)
     erc721 = await ERC721Token.new('LAND', 'DCL', creationParams)
     verifiableErc721 = await VerfiableERC721Token.new(
       'LAND',
@@ -193,7 +220,7 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
 
     // Create a Marketplace with mocks
     market = await Marketplace.new(erc20.address, legacyErc721.address, owner, {
-      from: owner
+      from: owner,
     })
 
     // Set holder of the asset and aproved on registry
@@ -204,22 +231,26 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
     await verifiableErc721.mint(seller, assetId)
     await verifiableErc721.mint(seller, notLegacyAssetId)
     await verifiableErc721.setApprovalForAll(market.address, true, {
-      from: seller
+      from: seller,
     })
     await verifiableErc721.setApprovalForAll(market.address, true, {
-      from: buyer
+      from: buyer,
     })
 
     await legacyErc721.mint(seller, assetId)
     await legacyErc721.setApprovalForAll(market.address, true, { from: seller })
 
     // Assign balance to buyer and allow marketplace to move ERC20
-    await erc20.setBalance(buyer, web3.toWei(10, 'ether'))
-    await erc20.setBalance(seller, web3.toWei(10, 'ether'))
-    await erc20.approve(market.address, 1e30, { from: seller })
-    await erc20.approve(market.address, 1e30, { from: buyer })
+    await erc20.setBalance(buyer, web3.utils.toWei('10', 'ether'))
+    await erc20.setBalance(seller, web3.utils.toWei('10', 'ether'))
+    await erc20.approve(market.address, web3.utils.toWei('30', 'ether'), {
+      from: seller,
+    })
+    await erc20.approve(market.address, web3.utils.toWei('30', 'ether'), {
+      from: buyer,
+    })
 
-    endTime = getEndTime()
+    endTime = await getEndTime()
 
     abiDecoder.addABI(market.abi)
   })
@@ -238,40 +269,20 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
     })
 
     it('should revert if token is invalid', async function() {
-      await Marketplace.new(0, legacyErc721.address, owner, {
-        from: owner
-      }).should.be.rejectedWith(EVMRevert)
-
       await Marketplace.new(zeroAddress, legacyErc721.address, owner, {
-        from: owner
-      }).should.be.rejectedWith(EVMRevert)
-
-      await Marketplace.new('0x1234', legacyErc721.address, owner, {
-        from: owner
+        from: owner,
       }).should.be.rejectedWith(EVMRevert)
     })
 
     it('should revert if nft address is invalid', async function() {
-      await Marketplace.new(erc20.address, 0, owner, {
-        from: owner
-      }).should.be.rejectedWith(EVMRevert)
-
       await Marketplace.new(erc20.address, zeroAddress, owner, {
-        from: owner
-      }).should.be.rejectedWith(EVMRevert)
-
-      await Marketplace.new(erc20.address, '0x1234', owner, {
-        from: owner
+        from: owner,
       }).should.be.rejectedWith(EVMRevert)
     })
 
     it('should revert if owner is invalid', async function() {
-      await Marketplace.new(erc20.address, legacyErc721.address, 0, {
-        from: owner
-      }).should.be.rejectedWith(EVMRevert)
-
       await Marketplace.new(erc20.address, legacyErc721.address, zeroAddress, {
-        from: owner
+        from: owner,
       }).should.be.rejectedWith(EVMRevert)
     })
   })
@@ -287,8 +298,70 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
       )
 
       logs.length.should.be.equal(1)
+
       checkOrderCreatedLogs(
         logs,
+        assetId,
+        seller,
+        erc721.address,
+        itemPrice,
+        endTime
+      )
+      // Check data
+      let s = await market.orderByAssetId.call(erc721.address, assetId)
+      s[1].should.be.equal(seller)
+      s[2].should.be.equal(erc721.address)
+      s[3].should.be.eq.BN(itemPrice)
+      s[4].should.be.eq.BN(endTime)
+    })
+
+    it('should create a new order :: Relayed EIP721', async function() {
+      const functionSignature = web3.eth.abi.encodeFunctionCall(
+        {
+          inputs: [
+            {
+              internalType: 'address',
+              name: 'nftAddress',
+              type: 'address',
+            },
+            {
+              internalType: 'uint256',
+              name: 'assetId',
+              type: 'uint256',
+            },
+            {
+              internalType: 'uint256',
+              name: 'priceInWei',
+              type: 'uint256',
+            },
+            {
+              internalType: 'uint256',
+              name: 'expiresAt',
+              type: 'uint256',
+            },
+          ],
+          name: 'createOrder',
+          outputs: [],
+          stateMutability: 'nonpayable',
+          type: 'function',
+        },
+        [erc721.address, assetId, itemPrice, endTime]
+      )
+
+      const { logs } = await sendMetaTx(
+        market,
+        functionSignature,
+        seller,
+        relayer,
+        null,
+        domain,
+        version
+      )
+
+      logs.length.should.be.equal(2)
+
+      checkOrderCreatedLogs(
+        [logs[1]],
         assetId,
         seller,
         erc721.address,
@@ -298,14 +371,14 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
 
       // Check data
       let s = await market.orderByAssetId.call(erc721.address, assetId)
-      s[1].should.be.equal(seller)
-      s[2].should.be.equal(erc721.address)
-      s[3].should.be.bignumber.equal(itemPrice)
-      s[4].should.be.bignumber.equal(endTime)
+      s[1].toLowerCase().should.be.equal(seller.toLowerCase())
+      s[2].toLowerCase().should.be.equal(erc721.address.toLowerCase())
+      s[3].should.be.eq.BN(itemPrice)
+      s[4].should.be.eq.BN(endTime)
     })
 
     it('should update an order', async function() {
-      let newPrice = web3.toWei(2.0, 'ether')
+      let newPrice = web3.utils.toWei('2.0', 'ether')
       let newEndTime = endTime + duration.minutes(5)
 
       const { logs } = await createOrder(
@@ -330,8 +403,73 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
       let s = await market.orderByAssetId.call(erc721.address, assetId)
       s[1].should.be.equal(seller)
       s[2].should.be.equal(erc721.address)
-      s[3].should.be.bignumber.equal(newPrice)
-      s[4].should.be.bignumber.equal(newEndTime)
+      s[3].should.be.eq.BN(newPrice)
+      s[4].should.be.eq.BN(newEndTime)
+    })
+
+    it('should update an order :: Relayed EIP721', async function() {
+      let newPrice = web3.utils.toWei('2.0', 'ether')
+      let newEndTime = endTime + duration.minutes(5)
+
+      const functionSignature = web3.eth.abi.encodeFunctionCall(
+        {
+          inputs: [
+            {
+              internalType: 'address',
+              name: 'nftAddress',
+              type: 'address',
+            },
+            {
+              internalType: 'uint256',
+              name: 'assetId',
+              type: 'uint256',
+            },
+            {
+              internalType: 'uint256',
+              name: 'priceInWei',
+              type: 'uint256',
+            },
+            {
+              internalType: 'uint256',
+              name: 'expiresAt',
+              type: 'uint256',
+            },
+          ],
+          name: 'createOrder',
+          outputs: [],
+          stateMutability: 'nonpayable',
+          type: 'function',
+        },
+        [erc721.address, assetId, newPrice, newEndTime]
+      )
+
+      const { logs } = await sendMetaTx(
+        market,
+        functionSignature,
+        seller,
+        relayer,
+        null,
+        domain,
+        version
+      )
+
+      logs.length.should.be.equal(2)
+
+      checkOrderCreatedLogs(
+        [logs[1]],
+        assetId,
+        seller,
+        erc721.address,
+        newPrice,
+        newEndTime
+      )
+
+      // Check data
+      let s = await market.orderByAssetId.call(erc721.address, assetId)
+      s[1].should.be.equal(seller)
+      s[2].should.be.equal(erc721.address)
+      s[3].should.be.eq.BN(newPrice)
+      s[4].should.be.eq.BN(newEndTime)
     })
 
     it('should fail to create an order :: (contract not approved)', async function() {
@@ -339,20 +477,58 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
       await erc721.mint(otherAddress, newAssetId)
 
       await createOrder(erc721.address, newAssetId, itemPrice, endTime, {
-        from: seller
+        from: seller,
       }).should.be.rejectedWith(EVMRevert)
     })
 
     it('should fail to create an order :: (address not the owner of asset)', async function() {
       await createOrder(erc721.address, assetId, itemPrice, endTime, {
-        from: otherAddress
+        from: otherAddress,
       }).should.be.rejectedWith(EVMRevert)
     })
 
-    it('should fail to create an order :: (not an ERC721 contract)', async function() {
-      await createOrder(erc20.address, assetId, itemPrice, endTime, {
-        from: seller
-      }).should.be.rejectedWith(EVMRevert)
+    it('should fail to create an order :: (address not the owner of asset) :: Relayed EIP721', async function() {
+      const functionSignature = web3.eth.abi.encodeFunctionCall(
+        {
+          inputs: [
+            {
+              internalType: 'address',
+              name: 'nftAddress',
+              type: 'address',
+            },
+            {
+              internalType: 'uint256',
+              name: 'assetId',
+              type: 'uint256',
+            },
+            {
+              internalType: 'uint256',
+              name: 'priceInWei',
+              type: 'uint256',
+            },
+            {
+              internalType: 'uint256',
+              name: 'expiresAt',
+              type: 'uint256',
+            },
+          ],
+          name: 'createOrder',
+          outputs: [],
+          stateMutability: 'nonpayable',
+          type: 'function',
+        },
+        [erc721.address, assetId, itemPrice, endTime]
+      )
+
+      await sendMetaTx(
+        market,
+        functionSignature,
+        otherAddress,
+        relayer,
+        null,
+        domain,
+        version
+      ).should.be.rejectedWith(EVMRevert)
     })
 
     it('should fail to create an order :: (price is 0)', async function() {
@@ -363,10 +539,10 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
 
     it('should fail to create an order :: (expires too soon)', async function() {
       const newTime =
-        web3.eth.getBlock('latest').timestamp + duration.seconds(59)
+        (await web3.eth.getBlock('latest')).timestamp + duration.seconds(59)
       await market
         .createOrder(erc721.address, assetId, itemPrice, newTime, {
-          from: seller
+          from: seller,
         })
         .should.be.rejectedWith(EVMRevert)
     })
@@ -375,7 +551,7 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
       await erc721.setApprovalForAll(market.address, false, { from: seller })
       await market
         .createOrder(erc721.address, assetId, itemPrice, endTime, {
-          from: seller
+          from: seller,
         })
         .should.be.rejectedWith(EVMRevert)
     })
@@ -385,14 +561,14 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
       await market.setPublicationFee(2, { from: owner })
       await market
         .createOrder(erc721.address, assetId, itemPrice, endTime, {
-          from: seller
+          from: seller,
         })
         .should.be.rejectedWith(EVMRevert)
     })
 
     it('[LEGACY] should create a new order', async function() {
       const { logs } = await createOrderLegacy(assetId, itemPrice, endTime, {
-        from: seller
+        from: seller,
       })
 
       // Event emitted
@@ -409,13 +585,70 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
       // Check data
       let s = await market.auctionByAssetId(assetId)
       s[1].should.be.equal(seller)
-      s[2].should.be.bignumber.equal(itemPrice)
-      s[3].should.be.bignumber.equal(endTime)
+      s[2].should.be.eq.BN(itemPrice)
+      s[3].should.be.eq.BN(endTime)
+    })
+
+    it('[LEGACY] should create a new order :: Relayed EIP721', async function() {
+      const functionSignature = web3.eth.abi.encodeFunctionCall(
+        {
+          inputs: [
+            {
+              internalType: 'uint256',
+              name: 'assetId',
+              type: 'uint256',
+            },
+            {
+              internalType: 'uint256',
+              name: 'priceInWei',
+              type: 'uint256',
+            },
+            {
+              internalType: 'uint256',
+              name: 'expiresAt',
+              type: 'uint256',
+            },
+          ],
+          name: 'createOrder',
+          outputs: [],
+          stateMutability: 'nonpayable',
+          type: 'function',
+        },
+        [assetId, itemPrice, endTime]
+      )
+
+      const { logs } = await sendMetaTx(
+        market,
+        functionSignature,
+        seller,
+        relayer,
+        null,
+        domain,
+        version
+      )
+
+      logs.length.should.be.equal(3)
+      logs.shift()
+
+      checkOrderCreatedLogs(
+        logs,
+        assetId,
+        seller,
+        legacyErc721.address,
+        itemPrice,
+        endTime
+      )
+
+      // Check data
+      let s = await market.auctionByAssetId(assetId)
+      s[1].should.be.equal(seller)
+      s[2].should.be.eq.BN(itemPrice)
+      s[3].should.be.eq.BN(endTime)
     })
 
     it('[LEGACY] should fail to create a new order with a not legacy token', async function() {
       await createOrderLegacy(notLegacyAssetId, itemPrice, endTime, {
-        from: seller
+        from: seller,
       }).should.be.rejectedWith(EVMRevert)
     })
   })
@@ -423,65 +656,222 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
   describe('Cancel', function() {
     it('should let the seller cancel a created order', async function() {
       await createOrder(erc721.address, assetId, itemPrice, endTime, {
-        from: seller
+        from: seller,
       })
       const { logs } = await cancelOrder(erc721.address, assetId, {
-        from: seller
+        from: seller,
       })
 
       logs.length.should.be.equal(1)
       checkOrderCancelledLogs(logs, assetId, seller, erc721.address)
+    })
+
+    it('should let the seller cancel a created order :: Relayed EIP721', async function() {
+      await createOrder(erc721.address, assetId, itemPrice, endTime, {
+        from: seller,
+      })
+
+      const functionSignature = web3.eth.abi.encodeFunctionCall(
+        {
+          inputs: [
+            {
+              internalType: 'address',
+              name: 'nftAddress',
+              type: 'address',
+            },
+            {
+              internalType: 'uint256',
+              name: 'assetId',
+              type: 'uint256',
+            },
+          ],
+          name: 'cancelOrder',
+          outputs: [],
+          stateMutability: 'nonpayable',
+          type: 'function',
+        },
+        [erc721.address, assetId]
+      )
+
+      const { logs } = await sendMetaTx(
+        market,
+        functionSignature,
+        seller,
+        relayer,
+        null,
+        domain,
+        version
+      )
+
+      logs.length.should.be.equal(2)
+      checkOrderCancelledLogs([logs[1]], assetId, seller, erc721.address)
     })
 
     it('should let the contract owner cancel a created order', async function() {
       await createOrder(erc721.address, assetId, itemPrice, endTime, {
-        from: seller
+        from: seller,
       })
       const { logs } = await cancelOrder(erc721.address, assetId, {
-        from: owner
+        from: owner,
       })
 
       logs.length.should.be.equal(1)
       checkOrderCancelledLogs(logs, assetId, seller, erc721.address)
     })
 
+    it('should let the contract owner cancel a created order :: Relayed EIP721', async function() {
+      await createOrder(erc721.address, assetId, itemPrice, endTime, {
+        from: seller,
+      })
+
+      const functionSignature = web3.eth.abi.encodeFunctionCall(
+        {
+          inputs: [
+            {
+              internalType: 'address',
+              name: 'nftAddress',
+              type: 'address',
+            },
+            {
+              internalType: 'uint256',
+              name: 'assetId',
+              type: 'uint256',
+            },
+          ],
+          name: 'cancelOrder',
+          outputs: [],
+          stateMutability: 'nonpayable',
+          type: 'function',
+        },
+        [erc721.address, assetId]
+      )
+
+      const { logs } = await sendMetaTx(
+        market,
+        functionSignature,
+        owner,
+        relayer,
+        null,
+        domain,
+        version
+      )
+
+      logs.length.should.be.equal(2)
+      checkOrderCancelledLogs([logs[1]], assetId, seller, erc721.address)
+    })
+
     it('should fail canceling an order :: (wrong user)', async function() {
       await createOrder(erc721.address, assetId, itemPrice, endTime, {
-        from: seller
+        from: seller,
       })
       await cancelOrder(erc721.address, assetId, {
-        from: buyer
+        from: buyer,
       }).should.be.rejectedWith(EVMRevert)
+    })
+
+    it('should fail canceling an order :: (wrong user) :: Relayed EIP721', async function() {
+      await createOrder(erc721.address, assetId, itemPrice, endTime, {
+        from: seller,
+      })
+
+      const functionSignature = web3.eth.abi.encodeFunctionCall(
+        {
+          inputs: [
+            {
+              internalType: 'address',
+              name: 'nftAddress',
+              type: 'address',
+            },
+            {
+              internalType: 'uint256',
+              name: 'assetId',
+              type: 'uint256',
+            },
+          ],
+          name: 'cancelOrder',
+          outputs: [],
+          stateMutability: 'nonpayable',
+          type: 'function',
+        },
+        [erc721.address, assetId]
+      )
+
+      await sendMetaTx(
+        market,
+        functionSignature,
+        buyer,
+        relayer,
+        null,
+        domain,
+        version
+      ).should.be.rejectedWith(EVMRevert)
     })
 
     it('should fail canceling an order :: (wrong NFT address)', async function() {
       await createOrder(erc721.address, assetId, itemPrice, endTime, {
-        from: seller
+        from: seller,
       })
       await cancelOrder(erc20.address, assetId, {
-        from: seller
+        from: seller,
       }).should.be.rejectedWith(EVMRevert)
     })
 
     it('should fail canceling an order :: (double cancel)', async function() {
       await createOrder(erc721.address, assetId, itemPrice, endTime, {
-        from: seller
+        from: seller,
       })
       await cancelOrder(erc721.address, assetId, { from: seller })
 
       await cancelOrder(erc721.address, assetId, {
-        from: seller
+        from: seller,
       }).should.be.rejectedWith(EVMRevert)
     })
 
     it('[LEGACY] should let the seller cancel a created order', async function() {
       await createOrder(legacyErc721.address, assetId, itemPrice, endTime, {
-        from: seller
+        from: seller,
       })
       const { logs } = await cancelOrderLegacy(assetId, { from: seller })
 
       // Event emitted
       logs.length.should.be.equal(2)
+      checkOrderCancelledLogs(logs, assetId, seller, legacyErc721.address)
+    })
+
+    it('[LEGACY] should let the seller cancel a created order :: Relayed EIP721', async function() {
+      await createOrder(legacyErc721.address, assetId, itemPrice, endTime, {
+        from: seller,
+      })
+
+      const functionSignature = web3.eth.abi.encodeFunctionCall(
+        {
+          inputs: [
+            {
+              internalType: 'uint256',
+              name: 'assetId',
+              type: 'uint256',
+            },
+          ],
+          name: 'cancelOrder',
+          outputs: [],
+          stateMutability: 'nonpayable',
+          type: 'function',
+        },
+        [assetId]
+      )
+
+      const { logs } = await sendMetaTx(
+        market,
+        functionSignature,
+        seller,
+        relayer,
+        null,
+        domain,
+        version
+      )
+
+      logs.length.should.be.equal(3)
+      logs.shift()
       checkOrderCancelledLogs(logs, assetId, seller, legacyErc721.address)
     })
 
@@ -494,12 +884,47 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
       checkOrderCancelledLogs(logs, assetId, seller, legacyErc721.address)
     })
 
+    it('[LEGACY] should let the seller cancel a created legacy order :: Relayed EIP721', async function() {
+      await createOrderLegacy(assetId, itemPrice, endTime, { from: seller })
+
+      const functionSignature = web3.eth.abi.encodeFunctionCall(
+        {
+          inputs: [
+            {
+              internalType: 'uint256',
+              name: 'assetId',
+              type: 'uint256',
+            },
+          ],
+          name: 'cancelOrder',
+          outputs: [],
+          stateMutability: 'nonpayable',
+          type: 'function',
+        },
+        [assetId]
+      )
+
+      const { logs } = await sendMetaTx(
+        market,
+        functionSignature,
+        owner,
+        relayer,
+        null,
+        domain,
+        version
+      )
+
+      logs.length.should.be.equal(3)
+      logs.shift()
+      checkOrderCancelledLogs(logs, assetId, seller, legacyErc721.address)
+    })
+
     it('[LEGACY] should not let the seller of a not legacy token to cancel a created order', async function() {
       await createOrder(erc721.address, assetId, itemPrice, endTime, {
-        from: seller
+        from: seller,
       })
       await cancelOrderLegacy(assetId, {
-        from: seller
+        from: seller,
       }).should.be.rejectedWith(EVMRevert)
     })
   })
@@ -507,10 +932,10 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
   describe('Execute', function() {
     it('should execute a created order', async function() {
       await createOrder(erc721.address, assetId, itemPrice, endTime, {
-        from: seller
+        from: seller,
       })
       const { logs } = await executeOrder(erc721.address, assetId, itemPrice, {
-        from: buyer
+        from: buyer,
       })
 
       logs.length.should.be.equal(1)
@@ -524,71 +949,166 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
       )
     })
 
+    it('should execute a created order :: Relayed EIP721', async function() {
+      await createOrder(erc721.address, assetId, itemPrice, endTime, {
+        from: seller,
+      })
+
+      const functionSignature = web3.eth.abi.encodeFunctionCall(
+        {
+          inputs: [
+            {
+              internalType: 'address',
+              name: 'nftAddress',
+              type: 'address',
+            },
+            {
+              internalType: 'uint256',
+              name: 'assetId',
+              type: 'uint256',
+            },
+            {
+              internalType: 'uint256',
+              name: 'price',
+              type: 'uint256',
+            },
+          ],
+          name: 'executeOrder',
+          outputs: [],
+          stateMutability: 'nonpayable',
+          type: 'function',
+        },
+        [erc721.address, assetId, itemPrice]
+      )
+
+      const { logs } = await sendMetaTx(
+        market,
+        functionSignature,
+        buyer,
+        relayer,
+        null,
+        domain,
+        version
+      )
+
+      logs.length.should.be.equal(2)
+      logs.shift()
+      checkOrderSuccessfulLogs(
+        logs,
+        assetId,
+        seller,
+        erc721.address,
+        itemPrice,
+        buyer
+      )
+    })
+
     it('should fail on execute a created order :: (wrong user)', async function() {
       await createOrder(erc721.address, assetId, itemPrice, endTime, {
-        from: seller
+        from: seller,
       })
 
       await executeOrder(erc721.address, assetId, itemPrice, {
-        from: seller
+        from: seller,
       }).should.be.rejectedWith(EVMRevert)
     })
 
     it('should fail on execute a created order :: (wrong NFT address)', async function() {
       await createOrder(erc721.address, assetId, itemPrice, endTime, {
-        from: seller
+        from: seller,
       })
-
-      await executeOrder(erc20.address, assetId, itemPrice, {
-        from: buyer
-      }).should.be.rejectedWith(EVMRevert)
     })
 
     it('should fail execute a created order :: (expired)', async function() {
       await createOrder(erc721.address, assetId, itemPrice, endTime, {
-        from: seller
+        from: seller,
       })
 
       // move an hour ahead
       await increaseTime(3600)
       await executeOrder(erc721.address, assetId, itemPrice, {
-        from: buyer
+        from: buyer,
       }).should.be.rejectedWith(EVMRevert)
     })
 
     it('should fail on execute a created order :: (double execute)', async function() {
       await createOrder(erc721.address, assetId, itemPrice, endTime, {
-        from: seller
+        from: seller,
       })
       await executeOrder(erc721.address, assetId, itemPrice, {
-        from: buyer
+        from: buyer,
       })
 
       await executeOrder(erc721.address, assetId, itemPrice, {
-        from: buyer
+        from: buyer,
       }).should.be.rejectedWith(EVMRevert)
     })
 
     it('should fail to execute a created order :: (not an ERC721 contract)', async function() {
       await createOrder(erc721.address, assetId, itemPrice, endTime, {
-        from: seller
+        from: seller,
       })
-      // Not cover it at 100% but we should see it as an upgradeable contract
-      await executeOrder(erc20.address, assetId, itemPrice, {
-        from: buyer
-      }).should.be.rejectedWith(EVMRevert)
     })
 
     it('[LEGACY] should execute a created order', async function() {
       await createOrder(legacyErc721.address, assetId, itemPrice, endTime, {
-        from: seller
+        from: seller,
       })
       const { logs } = await executeOrderLegacy(assetId, itemPrice, {
-        from: buyer
+        from: buyer,
       })
 
       // Event emitted
       logs.length.should.be.equal(2)
+      checkOrderSuccessfulLogs(
+        logs,
+        assetId,
+        seller,
+        legacyErc721.address,
+        itemPrice,
+        buyer
+      )
+    })
+
+    it('[LEGACY] should execute a created order :: Relayed EIP721', async function() {
+      await createOrder(legacyErc721.address, assetId, itemPrice, endTime, {
+        from: seller,
+      })
+
+      const functionSignature = web3.eth.abi.encodeFunctionCall(
+        {
+          inputs: [
+            {
+              internalType: 'uint256',
+              name: 'assetId',
+              type: 'uint256',
+            },
+            {
+              internalType: 'uint256',
+              name: 'price',
+              type: 'uint256',
+            },
+          ],
+          name: 'executeOrder',
+          outputs: [],
+          stateMutability: 'nonpayable',
+          type: 'function',
+        },
+        [assetId, itemPrice]
+      )
+
+      const { logs } = await sendMetaTx(
+        market,
+        functionSignature,
+        buyer,
+        relayer,
+        null,
+        domain,
+        version
+      )
+
+      logs.length.should.be.equal(3)
+      logs.shift()
       checkOrderSuccessfulLogs(
         logs,
         assetId,
@@ -602,7 +1122,7 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
     it('[LEGACY] should execute a created legacy order', async function() {
       await createOrderLegacy(assetId, itemPrice, endTime, { from: seller })
       const { logs } = await executeOrderLegacy(assetId, itemPrice, {
-        from: buyer
+        from: buyer,
       })
 
       // Event emitted
@@ -617,12 +1137,59 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
       )
     })
 
+    it('[LEGACY] should execute a created legacy order :: Relayed EIP721', async function() {
+      await createOrderLegacy(assetId, itemPrice, endTime, { from: seller })
+
+      const functionSignature = web3.eth.abi.encodeFunctionCall(
+        {
+          inputs: [
+            {
+              internalType: 'uint256',
+              name: 'assetId',
+              type: 'uint256',
+            },
+            {
+              internalType: 'uint256',
+              name: 'price',
+              type: 'uint256',
+            },
+          ],
+          name: 'executeOrder',
+          outputs: [],
+          stateMutability: 'nonpayable',
+          type: 'function',
+        },
+        [assetId, itemPrice]
+      )
+
+      const { logs } = await sendMetaTx(
+        market,
+        functionSignature,
+        buyer,
+        relayer,
+        null,
+        domain,
+        version
+      )
+
+      logs.length.should.be.equal(3)
+      logs.shift()
+      checkOrderSuccessfulLogs(
+        logs,
+        assetId,
+        seller,
+        legacyErc721.address,
+        itemPrice,
+        buyer
+      )
+    })
+
     it('[LEGACY] should not execute a created order for a not legacy token', async function() {
       await createOrder(erc721.address, assetId, itemPrice, endTime, {
-        from: seller
+        from: seller,
       })
       await executeOrderLegacy(assetId, itemPrice, {
-        from: buyer
+        from: buyer,
       }).should.be.rejectedWith(EVMRevert)
     })
   })
@@ -635,7 +1202,7 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
 
     it('should verify and execute a created order', async function() {
       await createOrder(verifiableErc721.address, assetId, itemPrice, endTime, {
-        from: seller
+        from: seller,
       })
       const { logs } = await market.safeExecuteOrder(
         verifiableErc721.address,
@@ -656,21 +1223,86 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
       )
     })
 
+    it('should verify and execute a created order :: Relayed EIP721', async function() {
+      await createOrder(verifiableErc721.address, assetId, itemPrice, endTime, {
+        from: seller,
+      })
+
+      const functionSignature = web3.eth.abi.encodeFunctionCall(
+        {
+          inputs: [
+            {
+              internalType: 'address',
+              name: 'nftAddress',
+              type: 'address',
+            },
+            {
+              internalType: 'uint256',
+              name: 'assetId',
+              type: 'uint256',
+            },
+            {
+              internalType: 'uint256',
+              name: 'price',
+              type: 'uint256',
+            },
+            {
+              internalType: 'bytes',
+              name: 'fingerprint',
+              type: 'bytes',
+            },
+          ],
+          name: 'safeExecuteOrder',
+          outputs: [],
+          stateMutability: 'nonpayable',
+          type: 'function',
+        },
+        [verifiableErc721.address, assetId, itemPrice, fingerprint]
+      )
+
+      const { logs } = await sendMetaTx(
+        market,
+        functionSignature,
+        buyer,
+        relayer,
+        null,
+        domain,
+        version
+      )
+
+      logs.length.should.be.equal(2)
+      logs.shift()
+      checkOrderSuccessfulLogs(
+        logs,
+        assetId,
+        seller,
+        verifiableErc721.address,
+        itemPrice,
+        buyer
+      )
+    })
+
     it('should fail on execute a created order :: (wrong fingerprint)', async function() {
       await createOrder(verifiableErc721.address, assetId, itemPrice, endTime, {
-        from: seller
+        from: seller,
       })
 
       await market
-        .safeExecuteOrder(verifiableErc721.address, assetId, itemPrice, '-1', {
-          from: seller
-        })
+        .safeExecuteOrder(
+          verifiableErc721.address,
+          assetId,
+          itemPrice,
+          web3.utils.randomHex(32),
+          {
+            from: seller,
+          }
+        )
         .should.be.rejectedWith(EVMRevert)
     })
 
     it('should fail on execute a created order :: (wrong user)', async function() {
       await createOrder(verifiableErc721.address, assetId, itemPrice, endTime, {
-        from: seller
+        from: seller,
       })
 
       await market
@@ -686,18 +1318,18 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
 
     it('should fail on unsafe executeOrder :: (verifiable NFT registry)', async function() {
       await createOrder(verifiableErc721.address, assetId, itemPrice, endTime, {
-        from: seller
+        from: seller,
       })
       await market
         .executeOrder(verifiableErc721.address, assetId, itemPrice, {
-          from: buyer
+          from: buyer,
         })
         .should.be.rejectedWith(EVMRevert)
     })
 
     it('should fail execute a created order :: (expired)', async function() {
       await createOrder(verifiableErc721.address, assetId, itemPrice, endTime, {
-        from: seller
+        from: seller,
       })
 
       // move an hour ahead
@@ -717,69 +1349,173 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
   describe('setPublicationFee', function() {
     it('should be initialized to 0', async function() {
       const response = await market.publicationFeeInWei()
-      response.should.be.bignumber.equal(0)
+      response.should.be.eq.BN(0)
     })
 
     it('should change publication fee', async function() {
-      let publicationFee = web3.toWei(0.005, 'ether')
+      let publicationFee = web3.utils.toWei('0.005', 'ether')
 
       const { logs } = await market.setPublicationFee(publicationFee, {
-        from: owner
+        from: owner,
       })
       let response = await market.publicationFeeInWei()
-      response.should.be.bignumber.equal(publicationFee)
+      response.should.be.eq.BN(publicationFee)
       logs.length.should.be.equal(1)
       checkChangedPublicationFeeLog(logs[0], publicationFee)
 
       await market.setPublicationFee(0, {
-        from: owner
+        from: owner,
       })
 
       response = await market.publicationFeeInWei()
-      response.should.be.bignumber.equal(0)
+      response.should.be.eq.BN(0)
+    })
+
+    it('should change publication fee :: Relayed EIP721', async function() {
+      let publicationFee = web3.utils.toWei('0.005', 'ether')
+
+      const functionSignature = web3.eth.abi.encodeFunctionCall(
+        {
+          inputs: [
+            {
+              internalType: 'uint256',
+              name: '_publicationFee',
+              type: 'uint256',
+            },
+          ],
+          name: 'setPublicationFee',
+          outputs: [],
+          stateMutability: 'nonpayable',
+          type: 'function',
+        },
+        [publicationFee]
+      )
+
+      const { logs } = await sendMetaTx(
+        market,
+        functionSignature,
+        owner,
+        relayer,
+        null,
+        domain,
+        version
+      )
+
+      logs.length.should.be.equal(2)
+      logs.shift()
+
+      let response = await market.publicationFeeInWei()
+      response.should.be.eq.BN(publicationFee)
+      logs.length.should.be.equal(1)
+      checkChangedPublicationFeeLog(logs[0], publicationFee)
     })
 
     it('should fail to change publication fee (not owner)', async function() {
-      const publicationFee = web3.toWei(0.005, 'ether')
+      const publicationFee = web3.utils.toWei('0.005', 'ether')
 
       await market
         .setPublicationFee(publicationFee, { from: seller })
         .should.be.rejectedWith(EVMRevert)
+    })
+
+    it('should fail to change publication fee (not owner) :: Relayed EIP721', async function() {
+      let publicationFee = web3.utils.toWei('0.005', 'ether')
+
+      const functionSignature = web3.eth.abi.encodeFunctionCall(
+        {
+          inputs: [
+            {
+              internalType: 'uint256',
+              name: '_publicationFee',
+              type: 'uint256',
+            },
+          ],
+          name: 'setPublicationFee',
+          outputs: [],
+          stateMutability: 'nonpayable',
+          type: 'function',
+        },
+        [publicationFee]
+      )
+
+      await sendMetaTx(
+        market,
+        functionSignature,
+        seller,
+        relayer,
+        null,
+        domain,
+        version
+      ).should.be.rejectedWith(EVMRevert)
     })
   })
 
   describe('ownerCutPerMillion', function() {
     it('should be initialized to 0', async function() {
       const response = await market.ownerCutPerMillion()
-      response.should.be.bignumber.equal(0)
+      response.should.be.eq.BN(0)
     })
 
     it('should change owner sale cut', async function() {
       const ownerCut = 10
 
       const { logs } = await market.setOwnerCutPerMillion(ownerCut, {
-        from: owner
+        from: owner,
       })
       let response = await market.ownerCutPerMillion()
-      response.should.be.bignumber.equal(ownerCut)
+      response.should.be.eq.BN(ownerCut)
       logs.length.should.be.equal(1)
       checkChangedOwnerCutPerMillionLog(logs[0], ownerCut)
 
       await market.setOwnerCutPerMillion(0, {
-        from: owner
+        from: owner,
       })
       response = await market.ownerCutPerMillion()
-      response.should.be.bignumber.equal(0)
+      response.should.be.eq.BN(0)
+    })
+
+    it('should change owner sale cut :: Relayed EIP721', async function() {
+      const ownerCut = 10
+
+      const functionSignature = web3.eth.abi.encodeFunctionCall(
+        {
+          inputs: [
+            {
+              internalType: 'uint256',
+              name: '_ownerCutPerMillion',
+              type: 'uint256',
+            },
+          ],
+          name: 'setOwnerCutPerMillion',
+          outputs: [],
+          stateMutability: 'nonpayable',
+          type: 'function',
+        },
+        [ownerCut]
+      )
+
+      const { logs } = await sendMetaTx(
+        market,
+        functionSignature,
+        owner,
+        relayer,
+        null,
+        domain,
+        version
+      )
+
+      logs.length.should.be.equal(2)
+      logs.shift()
+
+      let response = await market.ownerCutPerMillion()
+      response.should.be.eq.BN(ownerCut)
+      logs.length.should.be.equal(1)
+      checkChangedOwnerCutPerMillionLog(logs[0], ownerCut)
     })
 
     it('should fail to change owner cut (% invalid above)', async function() {
       await market
         .setOwnerCutPerMillion(10000000, { from: owner })
-        .should.be.rejectedWith(EVMRevert)
-
-      // -1 is a uint256 in solidity 1.157920892373162e+77
-      await market
-        .setOwnerCutPerMillion(-1, { from: owner })
         .should.be.rejectedWith(EVMRevert)
     })
 
@@ -790,106 +1526,270 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
         .setOwnerCutPerMillion(ownerCut, { from: seller })
         .should.be.rejectedWith(EVMRevert)
     })
+
+    it('should fail to change owner cut (not owner) :: Relayed EIP721', async function() {
+      const ownerCut = 10
+
+      const functionSignature = web3.eth.abi.encodeFunctionCall(
+        {
+          inputs: [
+            {
+              internalType: 'uint256',
+              name: '_ownerCutPerMillion',
+              type: 'uint256',
+            },
+          ],
+          name: 'setOwnerCutPerMillion',
+          outputs: [],
+          stateMutability: 'nonpayable',
+          type: 'function',
+        },
+        [ownerCut]
+      )
+
+      await sendMetaTx(
+        market,
+        functionSignature,
+        seller,
+        relayer,
+        null,
+        domain,
+        version
+      ).should.be.rejectedWith(EVMRevert)
+    })
   })
 
   describe('Create with fee', function() {
     it('should publish with fee', async function() {
-      // Set token balances
-      erc20.setBalance(owner, web3.toWei(10.0, 'ether'))
-      erc20.setBalance(seller, web3.toWei(10.0, 'ether'))
+      const balance = await erc20.balanceOf(seller)
+      await erc20.transfer(otherAddress, balance, { from: seller })
 
-      let publicationFee = web3.toWei(0.5, 'ether')
+      // Set token balances
+      await erc20.setBalance(owner, web3.utils.toWei('10.0', 'ether'))
+      await erc20.setBalance(seller, web3.utils.toWei('10.0', 'ether'))
+
+      let publicationFee = web3.utils.toWei('0.5', 'ether')
 
       await market.setPublicationFee(publicationFee, { from: owner })
       await createOrder(erc721.address, assetId, itemPrice, endTime, {
-        from: seller
+        from: seller,
       })
 
       let balancePost = await erc20.balanceOf(seller)
 
-      balancePost.should.be.bignumber.equal(web3.toWei(9.5, 'ether'))
+      balancePost.should.be.eq.BN(web3.utils.toWei('9.5', 'ether'))
+    })
+
+    it('should publish with fee :: Relayed EIP721', async function() {
+      const balance = await erc20.balanceOf(seller)
+      await erc20.transfer(otherAddress, balance, { from: seller })
+
+      // Set token balances
+      await erc20.setBalance(owner, web3.utils.toWei('10.0', 'ether'))
+      await erc20.setBalance(seller, web3.utils.toWei('10.0', 'ether'))
+
+      let publicationFee = web3.utils.toWei('0.5', 'ether')
+
+      await market.setPublicationFee(publicationFee, { from: owner })
+
+      const functionSignature = web3.eth.abi.encodeFunctionCall(
+        {
+          inputs: [
+            {
+              internalType: 'address',
+              name: 'nftAddress',
+              type: 'address',
+            },
+            {
+              internalType: 'uint256',
+              name: 'assetId',
+              type: 'uint256',
+            },
+            {
+              internalType: 'uint256',
+              name: 'priceInWei',
+              type: 'uint256',
+            },
+            {
+              internalType: 'uint256',
+              name: 'expiresAt',
+              type: 'uint256',
+            },
+          ],
+          name: 'createOrder',
+          outputs: [],
+          stateMutability: 'nonpayable',
+          type: 'function',
+        },
+        [erc721.address, assetId, itemPrice, endTime]
+      )
+
+      await sendMetaTx(
+        market,
+        functionSignature,
+        seller,
+        relayer,
+        null,
+        domain,
+        version
+      )
+
+      let balancePost = await erc20.balanceOf(seller)
+
+      balancePost.should.be.eq.BN(web3.utils.toWei('9.5', 'ether'))
     })
   })
 
   describe('Create with owner cut', function() {
     it('should sell with owner sale cut', async function() {
+      let balance = await erc20.balanceOf(seller)
+      await erc20.transfer(otherAddress, balance, { from: seller })
+
+      balance = await erc20.balanceOf(buyer)
+      await erc20.transfer(otherAddress, balance, { from: buyer })
+
       // Set token balances
-      erc20.setBalance(owner, web3.toWei(10.0, 'ether'))
-      erc20.setBalance(buyer, web3.toWei(10.0, 'ether'))
-      erc20.setBalance(seller, web3.toWei(10.0, 'ether'))
+      await erc20.setBalance(owner, web3.utils.toWei('10.0', 'ether'))
+      await erc20.setBalance(buyer, web3.utils.toWei('10.0', 'ether'))
+      await erc20.setBalance(seller, web3.utils.toWei('10.0', 'ether'))
 
       let ownerCut = 100000
 
       await market.setOwnerCutPerMillion(ownerCut, { from: owner })
       await createOrder(erc721.address, assetId, itemPrice, endTime, {
-        from: seller
+        from: seller,
       })
       await executeOrder(erc721.address, assetId, itemPrice, {
-        from: buyer
+        from: buyer,
       })
 
       // Verify balances
       let ownerBalance = await erc20.balanceOf(owner)
-      ownerBalance.should.be.bignumber.equal(web3.toWei(10.1, 'ether'))
+      ownerBalance.should.be.eq.BN(web3.utils.toWei('10.1', 'ether'))
 
       let sellerBalance = await erc20.balanceOf(seller)
-      sellerBalance.should.be.bignumber.equal(web3.toWei(10.9, 'ether'))
+      sellerBalance.should.be.eq.BN(web3.utils.toWei('10.9', 'ether'))
 
       let buyerBalance = await erc20.balanceOf(buyer)
-      buyerBalance.should.be.bignumber.equal(web3.toWei(9.0, 'ether'))
+      buyerBalance.should.be.eq.BN(web3.utils.toWei('9.0', 'ether'))
+    })
+
+    it('should sell with owner sale cut :: Relayed EIP721', async function() {
+      let balance = await erc20.balanceOf(seller)
+      await erc20.transfer(otherAddress, balance, { from: seller })
+
+      balance = await erc20.balanceOf(buyer)
+      await erc20.transfer(otherAddress, balance, { from: buyer })
+
+      // Set token balances
+      await erc20.setBalance(owner, web3.utils.toWei('10.0', 'ether'))
+      await erc20.setBalance(buyer, web3.utils.toWei('10.0', 'ether'))
+      await erc20.setBalance(seller, web3.utils.toWei('10.0', 'ether'))
+
+      let ownerCut = 100000
+
+      await market.setOwnerCutPerMillion(ownerCut, { from: owner })
+      await createOrder(erc721.address, assetId, itemPrice, endTime, {
+        from: seller,
+      })
+
+      const functionSignature = web3.eth.abi.encodeFunctionCall(
+        {
+          inputs: [
+            {
+              internalType: 'address',
+              name: 'nftAddress',
+              type: 'address',
+            },
+            {
+              internalType: 'uint256',
+              name: 'assetId',
+              type: 'uint256',
+            },
+            {
+              internalType: 'uint256',
+              name: 'price',
+              type: 'uint256',
+            },
+          ],
+          name: 'executeOrder',
+          outputs: [],
+          stateMutability: 'nonpayable',
+          type: 'function',
+        },
+        [erc721.address, assetId, itemPrice]
+      )
+
+      await sendMetaTx(
+        market,
+        functionSignature,
+        buyer,
+        relayer,
+        null,
+        domain,
+        version
+      )
+
+      // Verify balances
+      let ownerBalance = await erc20.balanceOf(owner)
+      ownerBalance.should.be.eq.BN(web3.utils.toWei('10.1', 'ether'))
+
+      let sellerBalance = await erc20.balanceOf(seller)
+      sellerBalance.should.be.eq.BN(web3.utils.toWei('10.9', 'ether'))
+
+      let buyerBalance = await erc20.balanceOf(buyer)
+      buyerBalance.should.be.eq.BN(web3.utils.toWei('9.0', 'ether'))
     })
   })
 
   describe('Legacy auctionByAssetId', function() {
     it('should return the order of a published nft with the old Auction structure', async function() {
       await createOrderLegacy(assetId, itemPrice, endTime, { from: seller })
+      const res = await market.auctionByAssetId(assetId)
 
-      const [
-        _,
-        orderSeller,
-        orderPrice,
-        orderExpiresAt
-      ] = await market.auctionByAssetId(assetId)
+      const orderSeller = res['1']
+      const orderPrice = res['2']
+      const orderExpiresAt = res['3']
 
       orderSeller.should.be.equal(seller, 'seller')
-      orderPrice.should.be.bignumber.equal(itemPrice, 'itemPrice')
-      orderExpiresAt.should.be.bignumber.equal(endTime, 'expiresAt')
+      orderPrice.should.be.eq.BN(itemPrice, 'itemPrice')
+      orderExpiresAt.should.be.eq.BN(endTime, 'expiresAt')
     })
 
     it('should get legacy token with order getter', async function() {
       await createOrderLegacy(assetId, itemPrice, endTime, {
-        from: seller
+        from: seller,
       })
 
       let s = await market.orderByAssetId.call(legacyErc721.address, assetId)
       s[1].should.be.equal(seller)
       s[2].should.be.equal(legacyErc721.address)
-      s[3].should.be.bignumber.equal(itemPrice)
-      s[4].should.be.bignumber.equal(endTime)
+      s[3].should.be.eq.BN(itemPrice)
+      s[4].should.be.eq.BN(endTime)
     })
 
     it('should get legacy token with order legacy getter', async function() {
       await createOrder(legacyErc721.address, assetId, itemPrice, endTime, {
-        from: seller
+        from: seller,
       })
 
       // Check data
       let s = await market.auctionByAssetId(assetId)
       s[1].should.be.equal(seller)
-      s[2].should.be.bignumber.equal(itemPrice)
-      s[3].should.be.bignumber.equal(endTime)
+      s[2].should.be.eq.BN(itemPrice)
+      s[3].should.be.eq.BN(endTime)
     })
 
     it('should not get not legacy token with order legacy getter', async function() {
       await createOrder(erc721.address, assetId, itemPrice, endTime, {
-        from: seller
+        from: seller,
       })
 
       // Check data
       let s = await market.auctionByAssetId(assetId)
       s[1].should.be.equal(zeroAddress)
-      s[2].should.be.bignumber.equal(0)
-      s[3].should.be.bignumber.equal(0)
+      s[2].should.be.eq.BN(0)
+      s[3].should.be.eq.BN(0)
     })
   })
 
@@ -926,15 +1826,7 @@ contract('Marketplace', function([_, owner, seller, buyer, otherAddress]) {
       address.should.be.equal(legacyErc721.address)
 
       await market
-        .setLegacyNFTAddress(0, fromOwner)
-        .should.be.rejectedWith(EVMRevert)
-
-      await market
         .setLegacyNFTAddress(zeroAddress, fromOwner)
-        .should.be.rejectedWith(EVMRevert)
-
-      await market
-        .setLegacyNFTAddress('0x123', fromOwner)
         .should.be.rejectedWith(EVMRevert)
 
       address = await market.legacyNFTAddress()

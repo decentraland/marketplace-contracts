@@ -1,17 +1,44 @@
-pragma solidity ^0.4.24;
+pragma solidity ^0.7.6;
 
-import "openzeppelin-zos/contracts/ownership/Ownable.sol";
-import "openzeppelin-zos/contracts/lifecycle/Pausable.sol";
-import "openzeppelin-zos/contracts/math/SafeMath.sol";
-import "openzeppelin-zos/contracts/AddressUtils.sol";
-import "zos-lib/contracts/migrations/Migratable.sol";
+import "@openzeppelin/contracts/math/SafeMath.sol";
+import "@openzeppelin/contracts/utils/Address.sol";
 
 import "./MarketplaceStorage.sol";
+import "../commons/Ownable.sol";
+import "../commons/Pausable.sol";
+import "../commons/ContextMixin.sol";
+import "../commons/NativeMetaTransaction.sol";
 
 
-contract Marketplace is Migratable, Ownable, Pausable, MarketplaceStorage {
+contract Marketplace is Ownable, Pausable, MarketplaceStorage, NativeMetaTransaction {
   using SafeMath for uint256;
-  using AddressUtils for address;
+  using Address for address;
+
+  /**
+    * @dev Initialize this contract. Acts as a constructor
+    * @param _acceptedToken - Address of the ERC20 accepted for this marketplace
+    * @param _legacyNFTAddress - Address of the NFT address used for legacy methods that don't have nftAddress as parameter
+    */
+  constructor (
+    address _acceptedToken,
+    address _legacyNFTAddress,
+    address _owner
+  )
+    public
+  {
+    // EIP712 init
+    _initializeEIP712('Decentraland Marketplace', '1');
+
+    require(_owner != address(0), "Invalid owner");
+    transferOwnership(_owner);
+
+    require(_acceptedToken.isContract(), "The accepted token address must be a deployed contract");
+    acceptedToken = ERC20Interface(_acceptedToken);
+
+    _requireERC721(_legacyNFTAddress);
+    legacyNFTAddress = _legacyNFTAddress;
+  }
+
 
   /**
     * @dev Sets the publication fee that's charged to users to publish items
@@ -43,31 +70,6 @@ contract Marketplace is Migratable, Ownable, Pausable, MarketplaceStorage {
 
     legacyNFTAddress = _legacyNFTAddress;
     emit ChangeLegacyNFTAddress(legacyNFTAddress);
-  }
-
-  /**
-    * @dev Initialize this contract. Acts as a constructor
-    * @param _acceptedToken - Address of the ERC20 accepted for this marketplace
-    * @param _legacyNFTAddress - Address of the NFT address used for legacy methods that don't have nftAddress as parameter
-    */
-  function initialize(
-    address _acceptedToken,
-    address _legacyNFTAddress,
-    address _owner
-  )
-    public
-    isInitializer("Marketplace", "0.0.1")
-  {
-
-    // msg.sender is the App contract not the real owner. Calls ownable behind the scenes...sigh
-    require(_owner != address(0), "Invalid owner");
-    Pausable.initialize(_owner);
-
-    require(_acceptedToken.isContract(), "The accepted token address must be a deployed contract");
-    acceptedToken = ERC20Interface(_acceptedToken);
-
-    _requireERC721(_legacyNFTAddress);
-    legacyNFTAddress = _legacyNFTAddress;
   }
 
   /**
@@ -161,7 +163,7 @@ contract Marketplace is Migratable, Ownable, Pausable, MarketplaceStorage {
     address nftAddress,
     uint256 assetId,
     uint256 price,
-    bytes fingerprint
+    bytes memory fingerprint
   )
    public
    whenNotPaused
@@ -220,7 +222,7 @@ contract Marketplace is Migratable, Ownable, Pausable, MarketplaceStorage {
       assetId,
       order.seller,
       price,
-      msg.sender
+      _msgSender()
     );
   }
 
@@ -258,10 +260,12 @@ contract Marketplace is Migratable, Ownable, Pausable, MarketplaceStorage {
   {
     _requireERC721(nftAddress);
 
+    address sender = _msgSender();
+
     ERC721Interface nftRegistry = ERC721Interface(nftAddress);
     address assetOwner = nftRegistry.ownerOf(assetId);
 
-    require(msg.sender == assetOwner, "Only the owner can create orders");
+    require(sender == assetOwner, "Only the owner can create orders");
     require(
       nftRegistry.getApproved(assetId) == address(this) || nftRegistry.isApprovedForAll(assetOwner, address(this)),
       "The contract is not authorized to manage the asset"
@@ -291,7 +295,7 @@ contract Marketplace is Migratable, Ownable, Pausable, MarketplaceStorage {
     // transfer the amount to marketplace owner
     if (publicationFeeInWei > 0) {
       require(
-        acceptedToken.transferFrom(msg.sender, owner, publicationFeeInWei),
+        acceptedToken.transferFrom(sender, owner(), publicationFeeInWei),
         "Transfering the publication fee to the Marketplace owner failed"
       );
     }
@@ -312,11 +316,12 @@ contract Marketplace is Migratable, Ownable, Pausable, MarketplaceStorage {
     * @param nftAddress - Address of the NFT registry
     * @param assetId - ID of the published NFT
     */
-  function _cancelOrder(address nftAddress, uint256 assetId) internal returns (Order) {
+  function _cancelOrder(address nftAddress, uint256 assetId) internal returns (Order memory) {
+    address sender = _msgSender();
     Order memory order = orderByAssetId[nftAddress][assetId];
 
     require(order.id != 0, "Asset not published");
-    require(order.seller == msg.sender || msg.sender == owner, "Unauthorized user");
+    require(order.seller == sender || sender == owner(), "Unauthorized user");
 
     bytes32 orderId = order.id;
     address orderSeller = order.seller;
@@ -344,11 +349,13 @@ contract Marketplace is Migratable, Ownable, Pausable, MarketplaceStorage {
     address nftAddress,
     uint256 assetId,
     uint256 price,
-    bytes fingerprint
+    bytes memory fingerprint
   )
-   internal returns (Order)
+   internal returns (Order memory)
   {
     _requireERC721(nftAddress);
+
+    address sender = _msgSender();
 
     ERC721Verifiable nftRegistry = ERC721Verifiable(nftAddress);
 
@@ -365,7 +372,7 @@ contract Marketplace is Migratable, Ownable, Pausable, MarketplaceStorage {
     address seller = order.seller;
 
     require(seller != address(0), "Invalid address");
-    require(seller != msg.sender, "Unauthorized user");
+    require(seller != sender, "Unauthorized user");
     require(order.price == price, "The price is not correct");
     require(block.timestamp < order.expiresAt, "The order expired");
     require(seller == nftRegistry.ownerOf(assetId), "The seller is no longer the owner");
@@ -381,21 +388,21 @@ contract Marketplace is Migratable, Ownable, Pausable, MarketplaceStorage {
 
       // Transfer share amount for marketplace Owner
       require(
-        acceptedToken.transferFrom(msg.sender, owner, saleShareAmount),
+        acceptedToken.transferFrom(sender, owner(), saleShareAmount),
         "Transfering the cut to the Marketplace owner failed"
       );
     }
 
     // Transfer sale amount to seller
     require(
-      acceptedToken.transferFrom(msg.sender, seller, price.sub(saleShareAmount)),
+      acceptedToken.transferFrom(sender, seller, price.sub(saleShareAmount)),
       "Transfering the sale amount to the seller failed"
     );
 
     // Transfer asset owner
     nftRegistry.safeTransferFrom(
       seller,
-      msg.sender,
+      sender,
       assetId
     );
 
@@ -405,7 +412,7 @@ contract Marketplace is Migratable, Ownable, Pausable, MarketplaceStorage {
       seller,
       nftAddress,
       price,
-      msg.sender
+      sender
     );
 
     return order;

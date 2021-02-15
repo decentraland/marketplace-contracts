@@ -5,6 +5,6 @@ MARKETPLACE=Marketplace.sol
 
 OUTPUT=full
 
-npx truffle-flattener contracts/marketplace/$MARKETPLACE > $OUTPUT/$MARKETPLACE
+npx hardhat flatten contracts/marketplace/$MARKETPLACE > $OUTPUT/$MARKETPLACE
 
 
