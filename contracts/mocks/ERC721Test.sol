@@ -4,7 +4,7 @@ import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 
 
 contract ERC721Test is ERC721 {
-  constructor(string memory name, string memory symbol) ERC721(name, symbol) {
+  constructor(string memory _name, string memory _symbol) ERC721(_name, _symbol) {
   }
 
 
