@@ -220,7 +220,6 @@ library SafeMath {
 
 // File @openzeppelin/contracts/utils/Address.sol@v3.4.0
 
-// SPDX-License-Identifier: MIT
 
 pragma solidity >=0.6.2 <0.8.0;
 
@@ -554,7 +553,6 @@ contract ContextMixin {
 
 // File contracts/commons/Ownable.sol
 
-// SPDX-License-Identifier: MIT
 
 pragma solidity >=0.6.0 <0.8.0;
 
@@ -625,7 +623,6 @@ abstract contract Ownable is ContextMixin {
 
 // File contracts/commons/Pausable.sol
 
-// SPDX-License-Identifier: MIT
 
 pragma solidity >=0.6.0 <0.8.0;
 
