@@ -6,3 +6,4 @@ cache
 artifacts
 .zos.session
 zos.local.json
+.env
