@@ -12,7 +12,7 @@ contract VerifiableERC721Test is ERC721Test {
     return getFingerprint(assetId) == _bytesToBytes32(fingerprint);
   }
 
-  function getFingerprint(uint256 /* assetId*/) public pure returns (bytes32) {
+  function getFingerprint(uint256 /*assetId*/) public pure returns (bytes32) {
     return bytes32(uint256(0x1234));
   }
 

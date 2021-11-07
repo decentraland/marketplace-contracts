@@ -10,6 +10,7 @@ contract RoyaltiesManager{
 
   /**
     * @notice Get the royalties receiver for an specific token
+    * @dev It tries to get the item beneficiary. If it is the ZERO address, will try to get the creator
     * @param _contractAddress - contract address
     * @param _tokenId - token id
     * @return royaltiesReceiver - address of the royalties receiver
@@ -42,7 +43,22 @@ contract RoyaltiesManager{
       return royaltiesReceiver;
     }
 
+    // Get item beneficiary
     (,,,,royaltiesReceiver,,) = abi.decode(res, (string, uint256, uint256, uint256, address, string, string));
+
+    if (royaltiesReceiver == address(0)) {
+      // If still the zero address, use the creator
+       (success, res) = address(_contractAddress).staticcall(
+        abi.encodeWithSelector(
+            IERC721CollectionV2(_contractAddress).creator.selector
+        ));
+
+        if (!success) {
+          return royaltiesReceiver;
+        }
+
+        royaltiesReceiver = abi.decode(res, (address));
+    }
 
     return royaltiesReceiver;
   }
