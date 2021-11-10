@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.7.6;
+pragma solidity ^0.8.0;
 
-import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
@@ -16,7 +15,6 @@ import "../interfaces/IRoyaltiesManager.sol";
 
 
 contract Marketplace is Ownable, Pausable, NativeMetaTransaction {
-  using SafeMath for uint256;
   using Address for address;
 
   IERC20 public acceptedToken;
@@ -283,7 +281,7 @@ contract Marketplace is Ownable, Pausable, NativeMetaTransaction {
       "The contract is not authorized to manage the asset"
     );
     require(priceInWei > 0, "Price should be bigger than 0");
-    require(expiresAt > block.timestamp.add(1 minutes), "Publication should be more than 1 minute in the future");
+    require(expiresAt > block.timestamp + 1 minutes, "Publication should be more than 1 minute in the future");
 
     bytes32 orderId = keccak256(
       abi.encodePacked(
@@ -395,7 +393,7 @@ contract Marketplace is Ownable, Pausable, NativeMetaTransaction {
 
     // Fees collector share
     if (feesCollectorCutPerMillion > 0 && feesCollector != address(0)) {
-      feesCollectorShareAmount = price.mul(feesCollectorCutPerMillion).div(1000000);
+      feesCollectorShareAmount = (price * feesCollectorCutPerMillion) / 1000000;
 
       require(
         acceptedToken.transferFrom(sender, feesCollector, feesCollectorShareAmount),
@@ -407,7 +405,7 @@ contract Marketplace is Ownable, Pausable, NativeMetaTransaction {
     if (royaltiesCutPerMillion > 0) {
       address royaltiesReceiver = royaltiesManager.getRoyaltiesReceiver(address(nftRegistry), assetId);
       if (royaltiesReceiver != address(0)) {
-        royaltiesShareAmount = price.mul(royaltiesCutPerMillion).div(1000000);
+        royaltiesShareAmount = (price * royaltiesCutPerMillion) / 1000000;
 
         require(
           acceptedToken.transferFrom(sender, royaltiesReceiver, royaltiesShareAmount),
