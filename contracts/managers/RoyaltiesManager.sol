@@ -8,6 +8,8 @@ import '../interfaces/IERC721CollectionV2.sol';
 
 contract RoyaltiesManager{
 
+  constructor() {}
+
   /**
     * @notice Get the royalties receiver for an specific token
     * @dev It tries to get the item beneficiary. If it is the ZERO address, will try to get the creator

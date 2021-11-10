@@ -14,7 +14,7 @@ import "../interfaces/IRoyaltiesManager.sol";
 
 
 
-contract Marketplace is Ownable, Pausable, NativeMetaTransaction {
+contract MarketplaceV2 is Ownable, Pausable, NativeMetaTransaction {
   using Address for address;
 
   IERC20 public acceptedToken;
@@ -76,24 +76,26 @@ contract Marketplace is Ownable, Pausable, NativeMetaTransaction {
   event ChangedPublicationFee(uint256 publicationFee);
   event ChangedFeesCollectorCutPerMillion(uint256 feesCollectorCutPerMillion);
   event ChangedRoyaltiesCutPerMillion(uint256 royaltiesCutPerMillion);
-  event FeesCollectorSet(address indexed _oldFeesCollector, address indexed _newFeesCollector);
-  event RoyaltiesManagerSet(IRoyaltiesManager indexed _oldRoyaltiesManager, IRoyaltiesManager indexed _newRoyaltiesManager);
+  event FeesCollectorSet(address indexed oldFeesCollector, address indexed newFeesCollector);
+  event RoyaltiesManagerSet(IRoyaltiesManager indexed oldRoyaltiesManager, IRoyaltiesManager indexed newRoyaltiesManager);
 
 
   /**
     * @dev Initialize this contract. Acts as a constructor
-    * @param _acceptedToken - Address of the ERC20 accepted for this marketplace
-    * @param _feesCollectorCutPerMillion - fees collector cut per million
     * @param _owner - owner
     * @param _feesCollector - fees collector
+    * @param _acceptedToken - Address of the ERC20 accepted for this marketplace
+    * @param _royaltiesManager - Royalties manager contract
+    * @param _feesCollectorCutPerMillion - fees collector cut per million
+    * @param _royaltiesCutPerMillion - royalties cut per million
     */
   constructor (
-    address _acceptedToken,
-    uint256 _feesCollectorCutPerMillion,
-    uint256 _royaltiesCutPerMillion,
     address _owner,
     address _feesCollector,
-    IRoyaltiesManager _royaltiesManager
+    address _acceptedToken,
+    IRoyaltiesManager _royaltiesManager,
+    uint256 _feesCollectorCutPerMillion,
+    uint256 _royaltiesCutPerMillion
   )  {
     // EIP712 init
     _initializeEIP712('Decentraland Marketplace', '2');
