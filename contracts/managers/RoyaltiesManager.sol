@@ -21,7 +21,7 @@ contract RoyaltiesManager{
     bool success;
     bytes memory res;
 
-    (success, res) = address(_contractAddress).staticcall(
+    (success, res) = _contractAddress.staticcall(
         abi.encodeWithSelector(
             IERC721CollectionV2(_contractAddress).decodeTokenId.selector,
             _tokenId
@@ -34,23 +34,21 @@ contract RoyaltiesManager{
 
     (uint256 itemId,) = abi.decode(res, (uint256, uint256));
 
-    (success, res) = address(_contractAddress).staticcall(
+    (success, res) = _contractAddress.staticcall(
         abi.encodeWithSelector(
             IERC721CollectionV2(_contractAddress).items.selector,
             itemId
         )
     );
 
-    if (!success) {
-      return royaltiesReceiver;
+    if (success) {
+      // Get item beneficiary
+      (,,,,royaltiesReceiver,,) = abi.decode(res, (string, uint256, uint256, uint256, address, string, string));
     }
-
-    // Get item beneficiary
-    (,,,,royaltiesReceiver,,) = abi.decode(res, (string, uint256, uint256, uint256, address, string, string));
 
     if (royaltiesReceiver == address(0)) {
       // If still the zero address, use the creator
-       (success, res) = address(_contractAddress).staticcall(
+       (success, res) = _contractAddress.staticcall(
         abi.encodeWithSelector(
             IERC721CollectionV2(_contractAddress).creator.selector
         ));

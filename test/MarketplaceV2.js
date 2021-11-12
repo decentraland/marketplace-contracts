@@ -2,6 +2,7 @@ const BN = web3.utils.BN
 const expect = require('chai').use(require('bn-chai')(BN)).expect
 
 const abiDecoder = require('abi-decoder')
+const { Erc721 } = require('decentraland-contract-plugins')
 
 const EVMRevert = 'VM Exception while processing transaction: revert'
 
@@ -9,6 +10,7 @@ const RoyaltiesManager = artifacts.require('RoyaltiesManager')
 const Marketplace = artifacts.require('MarketplaceV2')
 const ERC20Token = artifacts.require('ERC20Test')
 const ERC721Token = artifacts.require('ERC721Test')
+const ERC721Collection = artifacts.require('ERC721TestCollection')
 const VerfiableERC721Token = artifacts.require('VerifiableERC721Test')
 
 const { increaseTime, duration } = require('./helpers/increaseTime')
@@ -102,6 +104,42 @@ function checkChangedFeesCollectorCutPerMillionLog(
   )
 }
 
+function checkChangedRoyaltiesCutPerMillionLog(log, royaltiesCutPerMillion) {
+  log.event.should.be.equal('ChangedRoyaltiesCutPerMillion')
+  log.args.royaltiesCutPerMillion.should.be.eq.BN(
+    royaltiesCutPerMillion,
+    'royaltiesCutPerMillion'
+  )
+}
+
+function checkFeesCollectorSetLog(log, oldFeesCollector, newFeesCollector) {
+  log.event.should.be.equal('FeesCollectorSet')
+  log.args.oldFeesCollector.should.be.eq.BN(
+    oldFeesCollector,
+    'oldFeesCollector'
+  )
+  log.args.newFeesCollector.should.be.eq.BN(
+    newFeesCollector,
+    'newFeesCollector'
+  )
+}
+
+function checkRoyaltiesManagerSetLog(
+  log,
+  oldRoyaltiesManager,
+  newRoyaltiesManager
+) {
+  log.event.should.be.equal('RoyaltiesManagerSet')
+  log.args.oldRoyaltiesManager.should.be.eq.BN(
+    oldRoyaltiesManager,
+    'oldRoyaltiesManager'
+  )
+  log.args.newRoyaltiesManager.should.be.eq.BN(
+    newRoyaltiesManager,
+    'newRoyaltiesManager'
+  )
+}
+
 async function getEndTime(minutesAhead = 15) {
   const block = await web3.eth.getBlock('latest')
   return block.timestamp + duration.minutes(minutesAhead)
@@ -115,6 +153,10 @@ contract('Marketplace V2', function([
   otherAddress,
   relayer,
   feesCollector,
+  royaltiesCollector,
+  itemCreator,
+  itemBeneficiary,
+  anotherUser,
 ]) {
   const itemPrice = web3.utils.toWei('1', 'ether')
   const assetId = 10000
@@ -128,6 +170,7 @@ contract('Marketplace V2', function([
   let erc20
   let erc721
   let verifiableErc721
+  let erc721Collection
 
   let fingerprint
   let endTime
@@ -198,6 +241,11 @@ contract('Marketplace V2', function([
       'DCL',
       creationParams
     )
+    erc721Collection = await ERC721Collection.new(
+      'COLLECTION',
+      'COL',
+      creationParams
+    )
 
     // Create a Marketplace with mocks
     royaltiesManager = await RoyaltiesManager.new({
@@ -228,6 +276,15 @@ contract('Marketplace V2', function([
       from: seller,
     })
     await verifiableErc721.setApprovalForAll(market.address, true, {
+      from: buyer,
+    })
+
+    await erc721Collection.mint(seller, 0) // return beneficiary
+    await erc721Collection.mint(seller, assetId) // return creator
+    await erc721Collection.setApprovalForAll(market.address, true, {
+      from: seller,
+    })
+    await erc721Collection.setApprovalForAll(market.address, true, {
       from: buyer,
     })
 
@@ -1207,22 +1264,251 @@ contract('Marketplace V2', function([
     })
   })
 
+  describe('setFeesCollector', function() {
+    it('should change fee collector', async function() {
+      let _feesCollector = await market.feesCollector()
+      expect(_feesCollector).to.be.equal(feesCollector)
+
+      const { logs } = await market.setFeesCollector(anotherUser, {
+        from: owner,
+      })
+
+      _feesCollector = await market.feesCollector()
+      expect(_feesCollector).to.be.equal(anotherUser)
+
+      logs.length.should.be.equal(1)
+      checkFeesCollectorSetLog(logs[0], feesCollector, anotherUser)
+
+      await market.setFeesCollector(feesCollector, {
+        from: owner,
+      })
+
+      _feesCollector = await market.feesCollector()
+      expect(_feesCollector).to.be.equal(feesCollector)
+    })
+
+    it('should change fee collector :: Relayed EIP721', async function() {
+      let _feesCollector = await market.feesCollector()
+      expect(_feesCollector).to.be.equal(feesCollector)
+
+      const functionSignature = web3.eth.abi.encodeFunctionCall(
+        {
+          inputs: [
+            {
+              internalType: 'address',
+              name: '_feesCollector',
+              type: 'address',
+            },
+          ],
+          name: 'setFeesCollector',
+          outputs: [],
+          stateMutability: 'nonpayable',
+          type: 'function',
+        },
+        [anotherUser]
+      )
+
+      const { logs } = await sendMetaTx(
+        market,
+        functionSignature,
+        owner,
+        relayer,
+        null,
+        domain,
+        version
+      )
+
+      logs.length.should.be.equal(2)
+      logs.shift()
+
+      _feesCollector = await market.feesCollector()
+      expect(_feesCollector).to.be.equal(anotherUser)
+
+      logs.length.should.be.equal(1)
+      checkFeesCollectorSetLog(logs[0], feesCollector, anotherUser)
+    })
+
+    it('should fail to change fee collector address zero', async function() {
+      await market
+        .setFeesCollector(zeroAddress, { from: owner })
+        .should.be.rejectedWith(EVMRevert)
+    })
+
+    it('should fail to change fee collector (not owner)', async function() {
+      await market
+        .setFeesCollector(anotherUser, { from: seller })
+        .should.be.rejectedWith(EVMRevert)
+    })
+
+    it('should fail to change fee collector (not owner) :: Relayed EIP721', async function() {
+      const functionSignature = web3.eth.abi.encodeFunctionCall(
+        {
+          inputs: [
+            {
+              internalType: 'address',
+              name: '_feesCollector',
+              type: 'address',
+            },
+          ],
+          name: 'setFeesCollector',
+          outputs: [],
+          stateMutability: 'nonpayable',
+          type: 'function',
+        },
+        [anotherUser]
+      )
+
+      await sendMetaTx(
+        market,
+        functionSignature,
+        seller,
+        relayer,
+        null,
+        domain,
+        version
+      ).should.be.rejectedWith(EVMRevert)
+    })
+  })
+
+  describe('setRoyaltiesManager', function() {
+    it('should change royalties manager', async function() {
+      let _royaltiesManager = await market.royaltiesManager()
+      expect(_royaltiesManager).to.be.equal(royaltiesManager.address)
+
+      const { logs } = await market.setRoyaltiesManager(erc721.address, {
+        from: owner,
+      })
+
+      _royaltiesManager = await market.royaltiesManager()
+      expect(_royaltiesManager).to.be.equal(erc721.address)
+
+      logs.length.should.be.equal(1)
+      checkRoyaltiesManagerSetLog(
+        logs[0],
+        royaltiesManager.address,
+        erc721.address
+      )
+
+      await market.setRoyaltiesManager(royaltiesManager.address, {
+        from: owner,
+      })
+
+      _royaltiesManager = await market.royaltiesManager()
+      expect(_royaltiesManager).to.be.equal(royaltiesManager.address)
+    })
+
+    it('should change royalties manager :: Relayed EIP721', async function() {
+      let _royaltiesManager = await market.royaltiesManager()
+      expect(_royaltiesManager).to.be.equal(royaltiesManager.address)
+
+      const functionSignature = web3.eth.abi.encodeFunctionCall(
+        {
+          inputs: [
+            {
+              internalType: 'address',
+              name: '_royaltiesManager',
+              type: 'address',
+            },
+          ],
+          name: 'setRoyaltiesManager',
+          outputs: [],
+          stateMutability: 'nonpayable',
+          type: 'function',
+        },
+        [erc721.address]
+      )
+
+      const { logs } = await sendMetaTx(
+        market,
+        functionSignature,
+        owner,
+        relayer,
+        null,
+        domain,
+        version
+      )
+
+      logs.length.should.be.equal(2)
+      logs.shift()
+
+      _royaltiesManager = await market.royaltiesManager()
+      expect(_royaltiesManager).to.be.equal(erc721.address)
+
+      logs.length.should.be.equal(1)
+      checkRoyaltiesManagerSetLog(
+        logs[0],
+        royaltiesManager.address,
+        erc721.address
+      )
+    })
+
+    it('should fail to change royalties manager address zero', async function() {
+      await market
+        .setRoyaltiesManager(zeroAddress, { from: owner })
+        .should.be.rejectedWith(EVMRevert)
+    })
+
+    it('should fail to change royalties manager to a not contract', async function() {
+      await market
+        .setRoyaltiesManager(anotherUser, { from: owner })
+        .should.be.rejectedWith(EVMRevert)
+    })
+
+    it('should fail to change royalties manager (not owner)', async function() {
+      await market
+        .setRoyaltiesManager(erc721.address, { from: seller })
+        .should.be.rejectedWith(EVMRevert)
+    })
+
+    it('should fail to change royalties manager (not owner) :: Relayed EIP721', async function() {
+      const functionSignature = web3.eth.abi.encodeFunctionCall(
+        {
+          inputs: [
+            {
+              internalType: 'address',
+              name: '_royaltiesManager',
+              type: 'address',
+            },
+          ],
+          name: 'setRoyaltiesManager',
+          outputs: [],
+          stateMutability: 'nonpayable',
+          type: 'function',
+        },
+        [anotherUser]
+      )
+
+      await sendMetaTx(
+        market,
+        functionSignature,
+        seller,
+        relayer,
+        null,
+        domain,
+        version
+      ).should.be.rejectedWith(EVMRevert)
+    })
+  })
+
   describe('feesCollectorCutPerMillion', function() {
     it('should be initialized to 0', async function() {
       const response = await market.feesCollectorCutPerMillion()
       response.should.be.eq.BN(0)
     })
 
-    it('should change owner sale cut', async function() {
-      const ownerCut = 10
+    it('should change fee collector sale cut', async function() {
+      const feesCollectorCut = 10
 
-      const { logs } = await market.setFeesCollectorCutPerMillion(ownerCut, {
-        from: owner,
-      })
+      const { logs } = await market.setFeesCollectorCutPerMillion(
+        feesCollectorCut,
+        {
+          from: owner,
+        }
+      )
       let response = await market.feesCollectorCutPerMillion()
-      response.should.be.eq.BN(ownerCut)
+      response.should.be.eq.BN(feesCollectorCut)
       logs.length.should.be.equal(1)
-      checkChangedFeesCollectorCutPerMillionLog(logs[0], ownerCut)
+      checkChangedFeesCollectorCutPerMillionLog(logs[0], feesCollectorCut)
 
       await market.setFeesCollectorCutPerMillion(0, {
         from: owner,
@@ -1231,8 +1517,8 @@ contract('Marketplace V2', function([
       response.should.be.eq.BN(0)
     })
 
-    it('should change owner sale cut :: Relayed EIP721', async function() {
-      const ownerCut = 10
+    it('should change fee collector sale cut :: Relayed EIP721', async function() {
+      const feesCollectorCut = 10
 
       const functionSignature = web3.eth.abi.encodeFunctionCall(
         {
@@ -1248,7 +1534,7 @@ contract('Marketplace V2', function([
           stateMutability: 'nonpayable',
           type: 'function',
         },
-        [ownerCut]
+        [feesCollectorCut]
       )
 
       const { logs } = await sendMetaTx(
@@ -1265,27 +1551,35 @@ contract('Marketplace V2', function([
       logs.shift()
 
       let response = await market.feesCollectorCutPerMillion()
-      response.should.be.eq.BN(ownerCut)
+      response.should.be.eq.BN(feesCollectorCut)
       logs.length.should.be.equal(1)
-      checkChangedFeesCollectorCutPerMillionLog(logs[0], ownerCut)
+      checkChangedFeesCollectorCutPerMillionLog(logs[0], feesCollectorCut)
     })
 
-    it('should fail to change owner cut (% invalid above)', async function() {
+    it('should fail to change fee collector cut (% invalid above)', async function() {
       await market
         .setFeesCollectorCutPerMillion(10000000, { from: owner })
         .should.be.rejectedWith(EVMRevert)
     })
 
-    it('should fail to change owner cut (not owner)', async function() {
-      const ownerCut = 10
+    it('should fail to change fee collector cut (% invalid above along with royalties cut)', async function() {
+      await market.setRoyaltiesCutPerMillion(1, { from: owner })
 
       await market
-        .setFeesCollectorCutPerMillion(ownerCut, { from: seller })
+        .setFeesCollectorCutPerMillion(999999, { from: owner })
         .should.be.rejectedWith(EVMRevert)
     })
 
-    it('should fail to change owner cut (not owner) :: Relayed EIP721', async function() {
-      const ownerCut = 10
+    it('should fail to change fee collector cut (not owner)', async function() {
+      const feesCollectorCut = 10
+
+      await market
+        .setFeesCollectorCutPerMillion(feesCollectorCut, { from: seller })
+        .should.be.rejectedWith(EVMRevert)
+    })
+
+    it('should fail to change fee collector cut (not owner) :: Relayed EIP721', async function() {
+      const feesCollectorCut = 10
 
       const functionSignature = web3.eth.abi.encodeFunctionCall(
         {
@@ -1301,7 +1595,124 @@ contract('Marketplace V2', function([
           stateMutability: 'nonpayable',
           type: 'function',
         },
-        [ownerCut]
+        [feesCollectorCut]
+      )
+
+      await sendMetaTx(
+        market,
+        functionSignature,
+        seller,
+        relayer,
+        null,
+        domain,
+        version
+      ).should.be.rejectedWith(EVMRevert)
+    })
+  })
+
+  describe('royaltiesCutPerMillion', function() {
+    it('should be initialized to 0', async function() {
+      const response = await market.royaltiesCutPerMillion()
+      response.should.be.eq.BN(0)
+    })
+
+    it('should change royalties cut', async function() {
+      const royaltiesCut = 10
+
+      const { logs } = await market.setRoyaltiesCutPerMillion(royaltiesCut, {
+        from: owner,
+      })
+      let response = await market.royaltiesCutPerMillion()
+      response.should.be.eq.BN(royaltiesCut)
+      logs.length.should.be.equal(1)
+      checkChangedRoyaltiesCutPerMillionLog(logs[0], royaltiesCut)
+
+      await market.setRoyaltiesCutPerMillion(0, {
+        from: owner,
+      })
+      response = await market.royaltiesCutPerMillion()
+      response.should.be.eq.BN(0)
+    })
+
+    it('should change royalties cut :: Relayed EIP721', async function() {
+      const royaltiesCut = 10
+
+      const functionSignature = web3.eth.abi.encodeFunctionCall(
+        {
+          inputs: [
+            {
+              internalType: 'uint256',
+              name: '_royaltiesCutPerMillion',
+              type: 'uint256',
+            },
+          ],
+          name: 'setRoyaltiesCutPerMillion',
+          outputs: [],
+          stateMutability: 'nonpayable',
+          type: 'function',
+        },
+        [royaltiesCut]
+      )
+
+      const { logs } = await sendMetaTx(
+        market,
+        functionSignature,
+        owner,
+        relayer,
+        null,
+        domain,
+        version
+      )
+
+      logs.length.should.be.equal(2)
+      logs.shift()
+
+      let response = await market.royaltiesCutPerMillion()
+      response.should.be.eq.BN(royaltiesCut)
+      logs.length.should.be.equal(1)
+      checkChangedRoyaltiesCutPerMillionLog(logs[0], royaltiesCut)
+    })
+
+    it('should fail to change royalties cut (% invalid above)', async function() {
+      await market
+        .setRoyaltiesCutPerMillion(10000000, { from: owner })
+        .should.be.rejectedWith(EVMRevert)
+    })
+
+    it('should fail to change royalties cut (% invalid above along with fee collector cut)', async function() {
+      await market.setFeesCollectorCutPerMillion(1, { from: owner })
+
+      await market
+        .setRoyaltiesCutPerMillion(999999, { from: owner })
+        .should.be.rejectedWith(EVMRevert)
+    })
+
+    it('should fail to change royalties cut (not owner)', async function() {
+      const royaltiesCut = 10
+
+      await market
+        .setRoyaltiesCutPerMillion(royaltiesCut, { from: seller })
+        .should.be.rejectedWith(EVMRevert)
+    })
+
+    it('should fail to change royalties cut (not owner) :: Relayed EIP721', async function() {
+      const royaltiesCut = 10
+
+      const functionSignature = web3.eth.abi.encodeFunctionCall(
+        {
+          inputs: [
+            {
+              internalType: 'uint256',
+              name: '_royaltiesCutPerMillion',
+              type: 'uint256',
+            },
+          ],
+          name: 'setRoyaltiesCutPerMillion',
+          outputs: [],
+          stateMutability: 'nonpayable',
+          type: 'function',
+        },
+        [royaltiesCut]
       )
 
       await sendMetaTx(
@@ -1397,8 +1808,11 @@ contract('Marketplace V2', function([
     })
   })
 
-  describe('Create with fees collector cut', function() {
-    it('should sell with fees ollector sale cut', async function() {
+  describe('Create with cut', function() {
+    it('should sell with fees collector sale cut', async function() {
+      await erc721Collection.setCreator(itemCreator)
+      await erc721Collection.setBeneficiary(itemBeneficiary)
+
       let balance = await erc20.balanceOf(seller)
       await erc20.transfer(otherAddress, balance, { from: seller })
 
@@ -1409,6 +1823,8 @@ contract('Marketplace V2', function([
       await erc20.setBalance(feesCollector, web3.utils.toWei('10.0', 'ether'))
       await erc20.setBalance(buyer, web3.utils.toWei('10.0', 'ether'))
       await erc20.setBalance(seller, web3.utils.toWei('10.0', 'ether'))
+      await erc20.setBalance(itemCreator, web3.utils.toWei('10.0', 'ether'))
+      await erc20.setBalance(itemBeneficiary, web3.utils.toWei('10.0', 'ether'))
 
       let feesCollectorCut = 100000
 
@@ -1426,6 +1842,12 @@ contract('Marketplace V2', function([
       let feesCollectorBalance = await erc20.balanceOf(feesCollector)
       feesCollectorBalance.should.be.eq.BN(web3.utils.toWei('10.1', 'ether'))
 
+      let itemCreatorBalance = await erc20.balanceOf(itemCreator)
+      itemCreatorBalance.should.be.eq.BN(web3.utils.toWei('10.0', 'ether'))
+
+      let itemBeneficiaryBalance = await erc20.balanceOf(itemBeneficiary)
+      itemBeneficiaryBalance.should.be.eq.BN(web3.utils.toWei('10.0', 'ether'))
+
       let sellerBalance = await erc20.balanceOf(seller)
       sellerBalance.should.be.eq.BN(web3.utils.toWei('10.9', 'ether'))
 
@@ -1434,6 +1856,9 @@ contract('Marketplace V2', function([
     })
 
     it('should sell with fees collector sale cut :: Relayed EIP721', async function() {
+      await erc721Collection.setCreator(itemCreator)
+      await erc721Collection.setBeneficiary(itemBeneficiary)
+
       let balance = await erc20.balanceOf(seller)
       await erc20.transfer(otherAddress, balance, { from: seller })
 
@@ -1444,6 +1869,8 @@ contract('Marketplace V2', function([
       await erc20.setBalance(feesCollector, web3.utils.toWei('10.0', 'ether'))
       await erc20.setBalance(buyer, web3.utils.toWei('10.0', 'ether'))
       await erc20.setBalance(seller, web3.utils.toWei('10.0', 'ether'))
+      await erc20.setBalance(itemCreator, web3.utils.toWei('10.0', 'ether'))
+      await erc20.setBalance(itemBeneficiary, web3.utils.toWei('10.0', 'ether'))
 
       let feesCollectorCut = 100000
 
@@ -1495,8 +1922,481 @@ contract('Marketplace V2', function([
       let feesCollectorBalance = await erc20.balanceOf(feesCollector)
       feesCollectorBalance.should.be.eq.BN(web3.utils.toWei('10.1', 'ether'))
 
+      let itemCreatorBalance = await erc20.balanceOf(itemCreator)
+      itemCreatorBalance.should.be.eq.BN(web3.utils.toWei('10.0', 'ether'))
+
+      let itemBeneficiaryBalance = await erc20.balanceOf(itemBeneficiary)
+      itemBeneficiaryBalance.should.be.eq.BN(web3.utils.toWei('10.0', 'ether'))
+
       let sellerBalance = await erc20.balanceOf(seller)
       sellerBalance.should.be.eq.BN(web3.utils.toWei('10.9', 'ether'))
+
+      let buyerBalance = await erc20.balanceOf(buyer)
+      buyerBalance.should.be.eq.BN(web3.utils.toWei('9.0', 'ether'))
+    })
+
+    it('should sell with royalties collector sale cut (item beneficiary)', async function() {
+      await erc721Collection.setCreator(itemCreator)
+      await erc721Collection.setBeneficiary(itemBeneficiary)
+
+      let balance = await erc20.balanceOf(seller)
+      await erc20.transfer(otherAddress, balance, { from: seller })
+
+      balance = await erc20.balanceOf(buyer)
+      await erc20.transfer(otherAddress, balance, { from: buyer })
+
+      // Set token balances
+      await erc20.setBalance(feesCollector, web3.utils.toWei('10.0', 'ether'))
+      await erc20.setBalance(buyer, web3.utils.toWei('10.0', 'ether'))
+      await erc20.setBalance(seller, web3.utils.toWei('10.0', 'ether'))
+      await erc20.setBalance(itemCreator, web3.utils.toWei('10.0', 'ether'))
+      await erc20.setBalance(itemBeneficiary, web3.utils.toWei('10.0', 'ether'))
+
+      let royaltiesCutPerMillion = 100000
+
+      await market.setRoyaltiesCutPerMillion(royaltiesCutPerMillion, {
+        from: owner,
+      })
+      await createOrder(erc721Collection.address, assetId, itemPrice, endTime, {
+        from: seller,
+      })
+      await executeOrder(erc721Collection.address, assetId, itemPrice, {
+        from: buyer,
+      })
+
+      // Verify balances
+      let feesCollectorBalance = await erc20.balanceOf(feesCollector)
+      feesCollectorBalance.should.be.eq.BN(web3.utils.toWei('10.0', 'ether'))
+
+      let itemCreatorBalance = await erc20.balanceOf(itemCreator)
+      itemCreatorBalance.should.be.eq.BN(web3.utils.toWei('10.0', 'ether'))
+
+      let itemBeneficiaryBalance = await erc20.balanceOf(itemBeneficiary)
+      itemBeneficiaryBalance.should.be.eq.BN(web3.utils.toWei('10.1', 'ether'))
+
+      let sellerBalance = await erc20.balanceOf(seller)
+      sellerBalance.should.be.eq.BN(web3.utils.toWei('10.9', 'ether'))
+
+      let buyerBalance = await erc20.balanceOf(buyer)
+      buyerBalance.should.be.eq.BN(web3.utils.toWei('9.0', 'ether'))
+    })
+
+    it('should sell with fees collector sale cut (item beneficiary) :: Relayed EIP721', async function() {
+      await erc721Collection.setCreator(itemCreator)
+      await erc721Collection.setBeneficiary(itemBeneficiary)
+
+      let balance = await erc20.balanceOf(seller)
+      await erc20.transfer(otherAddress, balance, { from: seller })
+
+      balance = await erc20.balanceOf(buyer)
+      await erc20.transfer(otherAddress, balance, { from: buyer })
+
+      // Set token balances
+      await erc20.setBalance(feesCollector, web3.utils.toWei('10.0', 'ether'))
+      await erc20.setBalance(buyer, web3.utils.toWei('10.0', 'ether'))
+      await erc20.setBalance(seller, web3.utils.toWei('10.0', 'ether'))
+      await erc20.setBalance(itemCreator, web3.utils.toWei('10.0', 'ether'))
+      await erc20.setBalance(itemBeneficiary, web3.utils.toWei('10.0', 'ether'))
+
+      let royaltiesCutPerMillion = 100000
+
+      await market.setRoyaltiesCutPerMillion(royaltiesCutPerMillion, {
+        from: owner,
+      })
+      await createOrder(erc721Collection.address, assetId, itemPrice, endTime, {
+        from: seller,
+      })
+
+      const functionSignature = web3.eth.abi.encodeFunctionCall(
+        {
+          inputs: [
+            {
+              internalType: 'address',
+              name: 'nftAddress',
+              type: 'address',
+            },
+            {
+              internalType: 'uint256',
+              name: 'assetId',
+              type: 'uint256',
+            },
+            {
+              internalType: 'uint256',
+              name: 'price',
+              type: 'uint256',
+            },
+          ],
+          name: 'executeOrder',
+          outputs: [],
+          stateMutability: 'nonpayable',
+          type: 'function',
+        },
+        [erc721Collection.address, assetId, itemPrice]
+      )
+
+      await sendMetaTx(
+        market,
+        functionSignature,
+        buyer,
+        relayer,
+        null,
+        domain,
+        version
+      )
+
+      // Verify balances
+      let feesCollectorBalance = await erc20.balanceOf(feesCollector)
+      feesCollectorBalance.should.be.eq.BN(web3.utils.toWei('10.0', 'ether'))
+
+      let itemCreatorBalance = await erc20.balanceOf(itemCreator)
+      itemCreatorBalance.should.be.eq.BN(web3.utils.toWei('10.0', 'ether'))
+
+      let itemBeneficiaryBalance = await erc20.balanceOf(itemBeneficiary)
+      itemBeneficiaryBalance.should.be.eq.BN(web3.utils.toWei('10.1', 'ether'))
+
+      let sellerBalance = await erc20.balanceOf(seller)
+      sellerBalance.should.be.eq.BN(web3.utils.toWei('10.9', 'ether'))
+
+      let buyerBalance = await erc20.balanceOf(buyer)
+      buyerBalance.should.be.eq.BN(web3.utils.toWei('9.0', 'ether'))
+    })
+
+    it('should sell with royalties collector sale cut (item creator)', async function() {
+      await erc721Collection.setCreator(itemCreator)
+      await erc721Collection.setBeneficiary(itemBeneficiary)
+
+      let balance = await erc20.balanceOf(seller)
+      await erc20.transfer(otherAddress, balance, { from: seller })
+
+      balance = await erc20.balanceOf(buyer)
+      await erc20.transfer(otherAddress, balance, { from: buyer })
+
+      // Set token balances
+      await erc20.setBalance(feesCollector, web3.utils.toWei('10.0', 'ether'))
+      await erc20.setBalance(buyer, web3.utils.toWei('10.0', 'ether'))
+      await erc20.setBalance(seller, web3.utils.toWei('10.0', 'ether'))
+      await erc20.setBalance(itemCreator, web3.utils.toWei('10.0', 'ether'))
+      await erc20.setBalance(itemBeneficiary, web3.utils.toWei('10.0', 'ether'))
+
+      let royaltiesCutPerMillion = 100000
+
+      await market.setRoyaltiesCutPerMillion(royaltiesCutPerMillion, {
+        from: owner,
+      })
+      await createOrder(erc721Collection.address, 0, itemPrice, endTime, {
+        from: seller,
+      })
+      await executeOrder(erc721Collection.address, 0, itemPrice, {
+        from: buyer,
+      })
+
+      // Verify balances
+      let feesCollectorBalance = await erc20.balanceOf(feesCollector)
+      feesCollectorBalance.should.be.eq.BN(web3.utils.toWei('10.0', 'ether'))
+
+      let itemCreatorBalance = await erc20.balanceOf(itemCreator)
+      itemCreatorBalance.should.be.eq.BN(web3.utils.toWei('10.1', 'ether'))
+
+      let itemBeneficiaryBalance = await erc20.balanceOf(itemBeneficiary)
+      itemBeneficiaryBalance.should.be.eq.BN(web3.utils.toWei('10.0', 'ether'))
+
+      let sellerBalance = await erc20.balanceOf(seller)
+      sellerBalance.should.be.eq.BN(web3.utils.toWei('10.9', 'ether'))
+
+      let buyerBalance = await erc20.balanceOf(buyer)
+      buyerBalance.should.be.eq.BN(web3.utils.toWei('9.0', 'ether'))
+    })
+
+    it('should sell and no compute royalties if the receiver is the zero address', async function() {
+      await erc721Collection.setCreator(zeroAddress)
+      await erc721Collection.setBeneficiary(zeroAddress)
+
+      let balance = await erc20.balanceOf(seller)
+      await erc20.transfer(otherAddress, balance, { from: seller })
+
+      balance = await erc20.balanceOf(buyer)
+      await erc20.transfer(otherAddress, balance, { from: buyer })
+
+      // Set token balances
+      await erc20.setBalance(feesCollector, web3.utils.toWei('10.0', 'ether'))
+      await erc20.setBalance(buyer, web3.utils.toWei('10.0', 'ether'))
+      await erc20.setBalance(seller, web3.utils.toWei('10.0', 'ether'))
+      await erc20.setBalance(itemCreator, web3.utils.toWei('10.0', 'ether'))
+      await erc20.setBalance(itemBeneficiary, web3.utils.toWei('10.0', 'ether'))
+
+      let royaltiesCutPerMillion = 100000
+
+      await market.setRoyaltiesCutPerMillion(royaltiesCutPerMillion, {
+        from: owner,
+      })
+      await createOrder(erc721Collection.address, 0, itemPrice, endTime, {
+        from: seller,
+      })
+      await executeOrder(erc721Collection.address, 0, itemPrice, {
+        from: buyer,
+      })
+
+      // Verify balances
+      let feesCollectorBalance = await erc20.balanceOf(feesCollector)
+      feesCollectorBalance.should.be.eq.BN(web3.utils.toWei('10.0', 'ether'))
+
+      let itemCreatorBalance = await erc20.balanceOf(itemCreator)
+      itemCreatorBalance.should.be.eq.BN(web3.utils.toWei('10.0', 'ether'))
+
+      let itemBeneficiaryBalance = await erc20.balanceOf(itemBeneficiary)
+      itemBeneficiaryBalance.should.be.eq.BN(web3.utils.toWei('10.0', 'ether'))
+
+      let sellerBalance = await erc20.balanceOf(seller)
+      sellerBalance.should.be.eq.BN(web3.utils.toWei('11.0', 'ether'))
+
+      let buyerBalance = await erc20.balanceOf(buyer)
+      buyerBalance.should.be.eq.BN(web3.utils.toWei('9.0', 'ether'))
+    })
+
+    it('should sell and compute only fees collector cut if royalties beneficiary is the zero address', async function() {
+      await erc721Collection.setCreator(zeroAddress)
+      await erc721Collection.setBeneficiary(zeroAddress)
+
+      let balance = await erc20.balanceOf(seller)
+      await erc20.transfer(otherAddress, balance, { from: seller })
+
+      balance = await erc20.balanceOf(buyer)
+      await erc20.transfer(otherAddress, balance, { from: buyer })
+
+      // Set token balances
+      await erc20.setBalance(feesCollector, web3.utils.toWei('10.0', 'ether'))
+      await erc20.setBalance(buyer, web3.utils.toWei('10.0', 'ether'))
+      await erc20.setBalance(seller, web3.utils.toWei('10.0', 'ether'))
+      await erc20.setBalance(itemCreator, web3.utils.toWei('10.0', 'ether'))
+      await erc20.setBalance(itemBeneficiary, web3.utils.toWei('10.0', 'ether'))
+
+      let cutPerMillion = 100000
+
+      await market.setFeesCollectorCutPerMillion(cutPerMillion, {
+        from: owner,
+      })
+      await market.setRoyaltiesCutPerMillion(cutPerMillion, {
+        from: owner,
+      })
+      await createOrder(erc721Collection.address, 0, itemPrice, endTime, {
+        from: seller,
+      })
+      await executeOrder(erc721Collection.address, 0, itemPrice, {
+        from: buyer,
+      })
+
+      // Verify balances
+      let feesCollectorBalance = await erc20.balanceOf(feesCollector)
+      feesCollectorBalance.should.be.eq.BN(web3.utils.toWei('10.1', 'ether'))
+
+      let itemCreatorBalance = await erc20.balanceOf(itemCreator)
+      itemCreatorBalance.should.be.eq.BN(web3.utils.toWei('10.0', 'ether'))
+
+      let itemBeneficiaryBalance = await erc20.balanceOf(itemBeneficiary)
+      itemBeneficiaryBalance.should.be.eq.BN(web3.utils.toWei('10.0', 'ether'))
+
+      let sellerBalance = await erc20.balanceOf(seller)
+      sellerBalance.should.be.eq.BN(web3.utils.toWei('10.9', 'ether'))
+
+      let buyerBalance = await erc20.balanceOf(buyer)
+      buyerBalance.should.be.eq.BN(web3.utils.toWei('9.0', 'ether'))
+    })
+
+    it('should sell and compute only fees collector cut if the NFT is not a collection interface compliant', async function() {
+      await erc721Collection.setCreator(itemCreator)
+      await erc721Collection.setBeneficiary(itemBeneficiary)
+
+      let balance = await erc20.balanceOf(seller)
+      await erc20.transfer(otherAddress, balance, { from: seller })
+
+      balance = await erc20.balanceOf(buyer)
+      await erc20.transfer(otherAddress, balance, { from: buyer })
+
+      // Set token balances
+      await erc20.setBalance(feesCollector, web3.utils.toWei('10.0', 'ether'))
+      await erc20.setBalance(buyer, web3.utils.toWei('10.0', 'ether'))
+      await erc20.setBalance(seller, web3.utils.toWei('10.0', 'ether'))
+      await erc20.setBalance(itemCreator, web3.utils.toWei('10.0', 'ether'))
+      await erc20.setBalance(itemBeneficiary, web3.utils.toWei('10.0', 'ether'))
+
+      let cutPerMillion = 100000
+
+      await market.setFeesCollectorCutPerMillion(cutPerMillion, {
+        from: owner,
+      })
+      await market.setRoyaltiesCutPerMillion(cutPerMillion, {
+        from: owner,
+      })
+      await createOrder(erc721.address, assetId, itemPrice, endTime, {
+        from: seller,
+      })
+      await executeOrder(erc721.address, assetId, itemPrice, {
+        from: buyer,
+      })
+
+      // Verify balances
+      let feesCollectorBalance = await erc20.balanceOf(feesCollector)
+      feesCollectorBalance.should.be.eq.BN(web3.utils.toWei('10.1', 'ether'))
+
+      let itemCreatorBalance = await erc20.balanceOf(itemCreator)
+      itemCreatorBalance.should.be.eq.BN(web3.utils.toWei('10.0', 'ether'))
+
+      let itemBeneficiaryBalance = await erc20.balanceOf(itemBeneficiary)
+      itemBeneficiaryBalance.should.be.eq.BN(web3.utils.toWei('10.0', 'ether'))
+
+      let sellerBalance = await erc20.balanceOf(seller)
+      sellerBalance.should.be.eq.BN(web3.utils.toWei('10.9', 'ether'))
+
+      let buyerBalance = await erc20.balanceOf(buyer)
+      buyerBalance.should.be.eq.BN(web3.utils.toWei('9.0', 'ether'))
+    })
+
+    it('should sell and compute only fees collector cut if royalties manager is invalid (not collection compliant)', async function() {
+      await erc721Collection.setCreator(itemCreator)
+      await erc721Collection.setBeneficiary(itemBeneficiary)
+
+      await market.setRoyaltiesManager(erc721.address, { from: owner })
+
+      let balance = await erc20.balanceOf(seller)
+      await erc20.transfer(otherAddress, balance, { from: seller })
+
+      balance = await erc20.balanceOf(buyer)
+      await erc20.transfer(otherAddress, balance, { from: buyer })
+
+      // Set token balances
+      await erc20.setBalance(feesCollector, web3.utils.toWei('10.0', 'ether'))
+      await erc20.setBalance(buyer, web3.utils.toWei('10.0', 'ether'))
+      await erc20.setBalance(seller, web3.utils.toWei('10.0', 'ether'))
+      await erc20.setBalance(itemCreator, web3.utils.toWei('10.0', 'ether'))
+      await erc20.setBalance(itemBeneficiary, web3.utils.toWei('10.0', 'ether'))
+
+      let cutPerMillion = 100000
+
+      await market.setFeesCollectorCutPerMillion(cutPerMillion, {
+        from: owner,
+      })
+      await market.setRoyaltiesCutPerMillion(cutPerMillion, {
+        from: owner,
+      })
+      await createOrder(erc721.address, assetId, itemPrice, endTime, {
+        from: seller,
+      })
+      await executeOrder(erc721.address, assetId, itemPrice, {
+        from: buyer,
+      })
+
+      // Verify balances
+      let feesCollectorBalance = await erc20.balanceOf(feesCollector)
+      feesCollectorBalance.should.be.eq.BN(web3.utils.toWei('10.1', 'ether'))
+
+      let itemCreatorBalance = await erc20.balanceOf(itemCreator)
+      itemCreatorBalance.should.be.eq.BN(web3.utils.toWei('10.0', 'ether'))
+
+      let itemBeneficiaryBalance = await erc20.balanceOf(itemBeneficiary)
+      itemBeneficiaryBalance.should.be.eq.BN(web3.utils.toWei('10.0', 'ether'))
+
+      let sellerBalance = await erc20.balanceOf(seller)
+      sellerBalance.should.be.eq.BN(web3.utils.toWei('10.9', 'ether'))
+
+      let buyerBalance = await erc20.balanceOf(buyer)
+      buyerBalance.should.be.eq.BN(web3.utils.toWei('9.0', 'ether'))
+    })
+
+    it('should sell and compute only fees collector cut if royalties manager is invalid (collection compliant)', async function() {
+      await erc721Collection.setCreator(itemCreator)
+      await erc721Collection.setBeneficiary(itemBeneficiary)
+
+      await market.setRoyaltiesManager(erc721.address, { from: owner })
+
+      let balance = await erc20.balanceOf(seller)
+      await erc20.transfer(otherAddress, balance, { from: seller })
+
+      balance = await erc20.balanceOf(buyer)
+      await erc20.transfer(otherAddress, balance, { from: buyer })
+
+      // Set token balances
+      await erc20.setBalance(feesCollector, web3.utils.toWei('10.0', 'ether'))
+      await erc20.setBalance(buyer, web3.utils.toWei('10.0', 'ether'))
+      await erc20.setBalance(seller, web3.utils.toWei('10.0', 'ether'))
+      await erc20.setBalance(itemCreator, web3.utils.toWei('10.0', 'ether'))
+      await erc20.setBalance(itemBeneficiary, web3.utils.toWei('10.0', 'ether'))
+
+      let cutPerMillion = 100000
+
+      await market.setFeesCollectorCutPerMillion(cutPerMillion, {
+        from: owner,
+      })
+      await market.setRoyaltiesCutPerMillion(cutPerMillion, {
+        from: owner,
+      })
+      await createOrder(erc721Collection.address, assetId, itemPrice, endTime, {
+        from: seller,
+      })
+      await executeOrder(erc721Collection.address, assetId, itemPrice, {
+        from: buyer,
+      })
+
+      // Verify balances
+      let feesCollectorBalance = await erc20.balanceOf(feesCollector)
+      feesCollectorBalance.should.be.eq.BN(web3.utils.toWei('10.1', 'ether'))
+
+      let itemCreatorBalance = await erc20.balanceOf(itemCreator)
+      itemCreatorBalance.should.be.eq.BN(web3.utils.toWei('10.0', 'ether'))
+
+      let itemBeneficiaryBalance = await erc20.balanceOf(itemBeneficiary)
+      itemBeneficiaryBalance.should.be.eq.BN(web3.utils.toWei('10.0', 'ether'))
+
+      let sellerBalance = await erc20.balanceOf(seller)
+      sellerBalance.should.be.eq.BN(web3.utils.toWei('10.9', 'ether'))
+
+      let buyerBalance = await erc20.balanceOf(buyer)
+      buyerBalance.should.be.eq.BN(web3.utils.toWei('9.0', 'ether'))
+    })
+
+    it('should sell and compute both fees', async function() {
+      await erc721Collection.setCreator(itemCreator)
+      await erc721Collection.setBeneficiary(itemBeneficiary)
+
+      let balance = await erc20.balanceOf(seller)
+      await erc20.transfer(otherAddress, balance, { from: seller })
+
+      balance = await erc20.balanceOf(buyer)
+      await erc20.transfer(otherAddress, balance, { from: buyer })
+
+      // Set token balances
+      await erc20.setBalance(feesCollector, web3.utils.toWei('10.0', 'ether'))
+      await erc20.setBalance(buyer, web3.utils.toWei('10.0', 'ether'))
+      await erc20.setBalance(seller, web3.utils.toWei('10.0', 'ether'))
+      await erc20.setBalance(itemCreator, web3.utils.toWei('10.0', 'ether'))
+      await erc20.setBalance(itemBeneficiary, web3.utils.toWei('10.0', 'ether'))
+
+      let cutPerMillion = 100000
+
+      await market.setFeesCollectorCutPerMillion(cutPerMillion, {
+        from: owner,
+      })
+      await market.setRoyaltiesCutPerMillion(cutPerMillion, {
+        from: owner,
+      })
+      await createOrder(erc721Collection.address, assetId, itemPrice, endTime, {
+        from: seller,
+      })
+      await executeOrder(erc721Collection.address, assetId, itemPrice, {
+        from: buyer,
+      })
+
+      // Verify balances
+      let feesCollectorBalance = await erc20.balanceOf(feesCollector)
+      feesCollectorBalance.should.be.eq.BN(web3.utils.toWei('10.1', 'ether'))
+
+      let itemCreatorBalance = await erc20.balanceOf(itemCreator)
+      itemCreatorBalance.should.be.eq.BN(web3.utils.toWei('10.0', 'ether'))
+
+      let itemBeneficiaryBalance = await erc20.balanceOf(itemBeneficiary)
+      itemBeneficiaryBalance.should.be.eq.BN(web3.utils.toWei('10.1', 'ether'))
+
+      let sellerBalance = await erc20.balanceOf(seller)
+      sellerBalance.should.be.eq.BN(web3.utils.toWei('10.8', 'ether'))
 
       let buyerBalance = await erc20.balanceOf(buyer)
       buyerBalance.should.be.eq.BN(web3.utils.toWei('9.0', 'ether'))

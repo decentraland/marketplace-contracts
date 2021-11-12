@@ -100,19 +100,18 @@ contract MarketplaceV2 is Ownable, Pausable, NativeMetaTransaction {
     // EIP712 init
     _initializeEIP712('Decentraland Marketplace', '2');
 
-    // Fee init
-    setFeesCollectorCutPerMillion(_feesCollectorCutPerMillion);
-    setRoyaltiesCutPerMillion(_royaltiesCutPerMillion);
-
     // Address init
     setFeesCollector(_feesCollector);
     setRoyaltiesManager(_royaltiesManager);
 
+    // Fee init
+    setFeesCollectorCutPerMillion(_feesCollectorCutPerMillion);
+    setRoyaltiesCutPerMillion(_royaltiesCutPerMillion);
 
-    require(_owner != address(0), "Invalid owner");
+    require(_owner != address(0), "MarketplaceV2#constructor: INVALID_OWNER");
     transferOwnership(_owner);
 
-    require(_acceptedToken.isContract(), "The accepted token address must be a deployed contract");
+    require(_acceptedToken.isContract(), "MarketplaceV2#constructor: INVALID_ACCEPTED_TOKEN");
     acceptedToken = IERC20(_acceptedToken);
   }
 
@@ -134,7 +133,7 @@ contract MarketplaceV2 is Ownable, Pausable, NativeMetaTransaction {
   function setFeesCollectorCutPerMillion(uint256 _feesCollectorCutPerMillion) public onlyOwner {
     feesCollectorCutPerMillion = _feesCollectorCutPerMillion;
 
-    require(feesCollectorCutPerMillion + royaltiesCutPerMillion < 1000000, "The total fees must be between 0 and 999,999");
+    require(feesCollectorCutPerMillion + royaltiesCutPerMillion < 1000000, "MarketplaceV2#setFeesCollectorCutPerMillion: TOTAL_FEES_MUST_BE_BETWEEN_0_AND_999999");
 
     emit ChangedFeesCollectorCutPerMillion(feesCollectorCutPerMillion);
   }
@@ -147,7 +146,7 @@ contract MarketplaceV2 is Ownable, Pausable, NativeMetaTransaction {
   function setRoyaltiesCutPerMillion(uint256 _royaltiesCutPerMillion) public onlyOwner {
     royaltiesCutPerMillion = _royaltiesCutPerMillion;
 
-    require(feesCollectorCutPerMillion + royaltiesCutPerMillion < 1000000, "The total fees must be between 0 and 999,999");
+    require(feesCollectorCutPerMillion + royaltiesCutPerMillion < 1000000, "MarketplaceV2#setRoyaltiesCutPerMillion: TOTAL_FEES_MUST_BE_BETWEEN_0_AND_999999");
 
     emit ChangedRoyaltiesCutPerMillion(royaltiesCutPerMillion);
   }
@@ -168,7 +167,8 @@ contract MarketplaceV2 is Ownable, Pausable, NativeMetaTransaction {
   * @param _newRoyaltiesManager - royalties manager
   */
   function setRoyaltiesManager(IRoyaltiesManager _newRoyaltiesManager) onlyOwner public {
-      require(address(_newRoyaltiesManager) != address(0), "MarketplaceV2#setRoyaltiesManager: INVALID_ROYALTIES_MANAGER");
+      require(address(_newRoyaltiesManager).isContract(), "MarketplaceV2#setRoyaltiesManager: INVALID_ROYALTIES_MANAGER");
+
 
       emit RoyaltiesManagerSet(royaltiesManager, _newRoyaltiesManager);
       royaltiesManager = _newRoyaltiesManager;
@@ -277,13 +277,13 @@ contract MarketplaceV2 is Ownable, Pausable, NativeMetaTransaction {
     IERC721Verifiable nftRegistry = IERC721Verifiable(nftAddress);
     address assetOwner = nftRegistry.ownerOf(assetId);
 
-    require(sender == assetOwner, "Only the owner can create orders");
+    require(sender == assetOwner, "MarketplaceV2#_createOrder: NOT_ASSET_OWNER");
     require(
       nftRegistry.getApproved(assetId) == address(this) || nftRegistry.isApprovedForAll(assetOwner, address(this)),
       "The contract is not authorized to manage the asset"
     );
     require(priceInWei > 0, "Price should be bigger than 0");
-    require(expiresAt > block.timestamp + 1 minutes, "Publication should be more than 1 minute in the future");
+    require(expiresAt > block.timestamp + 1 minutes, "MarketplaceV2#_createOrder: INVALID_EXPIRES_AT");
 
     bytes32 orderId = keccak256(
       abi.encodePacked(
@@ -308,7 +308,7 @@ contract MarketplaceV2 is Ownable, Pausable, NativeMetaTransaction {
     if (publicationFeeInWei > 0) {
       require(
         acceptedToken.transferFrom(sender, owner(), publicationFeeInWei),
-        "Transfering the publication fee to the Marketplace owner failed"
+        "MarketplaceV2#_createOrder: TRANSFER_FAILED"
       );
     }
 
@@ -332,8 +332,8 @@ contract MarketplaceV2 is Ownable, Pausable, NativeMetaTransaction {
     address sender = _msgSender();
     Order memory order = orderByAssetId[nftAddress][assetId];
 
-    require(order.id != 0, "Asset not published");
-    require(order.seller == sender || sender == owner(), "Unauthorized user");
+    require(order.id != 0, "MarketplaceV2#_cancelOrder: INVALID_ORDER");
+    require(order.seller == sender || sender == owner(), "MarketplaceV2#_cancelOrder: UNAUTHORIZED_USER");
 
     bytes32 orderId = order.id;
     address orderSeller = order.seller;
@@ -374,18 +374,18 @@ contract MarketplaceV2 is Ownable, Pausable, NativeMetaTransaction {
     if (nftRegistry.supportsInterface(InterfaceId_ValidateFingerprint)) {
       require(
         nftRegistry.verifyFingerprint(assetId, fingerprint),
-        "The asset fingerprint is not valid"
+        "MarketplaceV2#_executeOrder: INVALID_FINGERPRINT"
       );
     }
     Order memory order = orderByAssetId[nftAddress][assetId];
 
-    require(order.id != 0, "Asset not published");
+    require(order.id != 0, "MarketplaceV2#_executeOrder: ASSET_NOT_FOR_SALE");
 
-    require(order.seller != address(0), "Invalid address");
-    require(order.seller != sender, "Unauthorized user");
-    require(order.price == price, "The price is not correct");
-    require(block.timestamp < order.expiresAt, "The order expired");
-    require(order.seller == nftRegistry.ownerOf(assetId), "The seller is no longer the owner");
+    require(order.seller != address(0), "MarketplaceV2#_executeOrder: INVALID_SELLER");
+    require(order.seller != sender, "MarketplaceV2#_executeOrder: UNAUTHORIZED_USER");
+    require(order.price == price, "MarketplaceV2#_executeOrder: PRICE_MISMATCH");
+    require(block.timestamp < order.expiresAt, "MarketplaceV2#_executeOrder: ORDER_EXPIRED");
+    require(order.seller == nftRegistry.ownerOf(assetId), "MarketplaceV2#_executeOrder: SELLER_NOT_OWNER");
 
 
     delete orderByAssetId[nftAddress][assetId];
@@ -399,27 +399,37 @@ contract MarketplaceV2 is Ownable, Pausable, NativeMetaTransaction {
 
       require(
         acceptedToken.transferFrom(sender, feesCollector, feesCollectorShareAmount),
-        "Transfering the fees collector cut failed"
+        "MarketplaceV2#_executeOrder: TRANSFER_FEES_TO_FEES_COLLECTOR_FAILED"
       );
     }
 
     // Royalties share
     if (royaltiesCutPerMillion > 0) {
-      address royaltiesReceiver = royaltiesManager.getRoyaltiesReceiver(address(nftRegistry), assetId);
-      if (royaltiesReceiver != address(0)) {
-        royaltiesShareAmount = (price * royaltiesCutPerMillion) / 1000000;
+      (bool success, bytes memory res) = address(royaltiesManager).staticcall(
+        abi.encodeWithSelector(
+            royaltiesManager.getRoyaltiesReceiver.selector,
+            address(nftRegistry),
+            assetId
+        )
+      );
 
-        require(
-          acceptedToken.transferFrom(sender, royaltiesReceiver, royaltiesShareAmount),
-          "Transfering the royalties cut failed"
-        );
+      if (success) {
+        (address royaltiesReceiver) = abi.decode(res, (address));
+        if (royaltiesReceiver != address(0)) {
+          royaltiesShareAmount = (price * royaltiesCutPerMillion) / 1000000;
+
+          require(
+            acceptedToken.transferFrom(sender, royaltiesReceiver, royaltiesShareAmount),
+            "MarketplaceV2#_executeOrder: TRANSFER_FEES_TO_ROYALTIES_RECEIVER_FAILED"
+          );
+        }
       }
     }
 
     // Transfer sale amount to seller
     require(
       acceptedToken.transferFrom(sender, order.seller, price - feesCollectorShareAmount - royaltiesShareAmount),
-      "Transfering the sale amount to the seller failed"
+      "MarketplaceV2#_executeOrder: TRANSFER_AMOUNT_TO_SELLER_FAILED"
     );
 
     // Transfer asset owner
@@ -442,12 +452,12 @@ contract MarketplaceV2 is Ownable, Pausable, NativeMetaTransaction {
   }
 
   function _requireERC721(address nftAddress) internal view {
-    require(nftAddress.isContract(), "The NFT Address should be a contract");
+    require(nftAddress.isContract(), "MarketplaceV2#_requireERC721: INVALID_NFT_ADDRESS");
 
     IERC721 nftRegistry = IERC721(nftAddress);
     require(
       nftRegistry.supportsInterface(ERC721_Interface),
-      "The NFT contract has an invalid ERC721 implementation"
+      "MarketplaceV2#_requireERC721: INVALID_ERC721_IMPLEMENTATION"
     );
   }
 }
