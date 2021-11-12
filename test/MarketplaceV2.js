@@ -160,6 +160,8 @@ contract('Marketplace V2', function([
   anotherUser,
 ]) {
   const itemPrice = web3.utils.toWei('1', 'ether')
+  const itemPrice2 = web3.utils.toWei('2', 'ether')
+
   const assetId = 10000
   const notLegacyAssetId = 2
   const zeroAddress = '0x0000000000000000000000000000000000000000'
@@ -1059,9 +1061,40 @@ contract('Marketplace V2', function([
     })
 
     it('should fail to execute a created order :: (not an ERC721 contract)', async function() {
+      await assertRevert(
+        createOrder(erc20.address, assetId, itemPrice, endTime, {
+          from: seller,
+        })
+      )
+    })
+
+    it('should fail to execute a created order :: (price mismatch)', async function() {
       await createOrder(erc721.address, assetId, itemPrice, endTime, {
         from: seller,
       })
+      await assertRevert(
+        executeOrder(erc721.address, assetId, itemPrice2, {
+          from: buyer,
+        }),
+        'MarketplaceV2#_executeOrder: PRICE_MISMATCH'
+      )
+    })
+
+    it('should fail to execute a created order :: (seller is not the owner)', async function() {
+      await createOrder(erc721.address, assetId, itemPrice, endTime, {
+        from: seller,
+      })
+
+      await erc721.transferFrom(seller, anotherUser, assetId, {
+        from: seller,
+      })
+
+      await assertRevert(
+        executeOrder(erc721.address, assetId, itemPrice, {
+          from: buyer,
+        }),
+        'MarketplaceV2#_executeOrder: SELLER_NOT_OWNER'
+      )
     })
   })
 
@@ -1217,6 +1250,44 @@ contract('Marketplace V2', function([
           { from: buyer }
         ),
         'MarketplaceV2#_executeOrder: ORDER_EXPIRED'
+      )
+    })
+
+    it('should fail to execute a created order :: (price mismatch)', async function() {
+      await createOrder(verifiableErc721.address, assetId, itemPrice, endTime, {
+        from: seller,
+      })
+
+      await assertRevert(
+        market.safeExecuteOrder(
+          verifiableErc721.address,
+          assetId,
+          itemPrice2,
+          fingerprint,
+          { from: buyer }
+        ),
+        'MarketplaceV2#_executeOrder: PRICE_MISMATCH'
+      )
+    })
+
+    it('should fail to execute a created order :: (seller is not the owner)', async function() {
+      await createOrder(verifiableErc721.address, assetId, itemPrice, endTime, {
+        from: seller,
+      })
+
+      await verifiableErc721.transferFrom(seller, anotherUser, assetId, {
+        from: seller,
+      })
+
+      await assertRevert(
+        market.safeExecuteOrder(
+          verifiableErc721.address,
+          assetId,
+          itemPrice,
+          fingerprint,
+          { from: buyer }
+        ),
+        'MarketplaceV2#_executeOrder: SELLER_NOT_OWNER'
       )
     })
   })
