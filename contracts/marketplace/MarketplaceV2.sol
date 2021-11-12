@@ -382,7 +382,7 @@ contract MarketplaceV2 is Ownable, Pausable, NativeMetaTransaction {
     require(order.id != 0, "MarketplaceV2#_executeOrder: ASSET_NOT_FOR_SALE");
 
     require(order.seller != address(0), "MarketplaceV2#_executeOrder: INVALID_SELLER");
-    require(order.seller != sender, "MarketplaceV2#_executeOrder: UNAUTHORIZED_USER");
+    require(order.seller != sender, "MarketplaceV2#_executeOrder: SENDER_IS_SELLER");
     require(order.price == price, "MarketplaceV2#_executeOrder: PRICE_MISMATCH");
     require(block.timestamp < order.expiresAt, "MarketplaceV2#_executeOrder: ORDER_EXPIRED");
     require(order.seller == nftRegistry.ownerOf(assetId), "MarketplaceV2#_executeOrder: SELLER_NOT_OWNER");

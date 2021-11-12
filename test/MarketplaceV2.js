@@ -15,6 +15,7 @@ const VerfiableERC721Token = artifacts.require('VerifiableERC721Test')
 
 const { increaseTime, duration } = require('./helpers/increaseTime')
 const { sendMetaTx } = require('./helpers/metaTx')
+const { assertRevert } = require('./helpers/assertRevert')
 
 function checkOrderCreatedLogs(
   logs,
@@ -321,113 +322,137 @@ contract('Marketplace V2', function([
     })
 
     it('should revert if owner is invalid', async function() {
-      await Marketplace.new(
-        zeroAddress,
-        feesCollector,
-        erc20.address,
-        royaltiesManager.address,
-        0,
-        0,
-        {
-          from: owner,
-        }
-      ).should.be.rejectedWith(EVMRevert)
+      await assertRevert(
+        Marketplace.new(
+          zeroAddress,
+          feesCollector,
+          erc20.address,
+          royaltiesManager.address,
+          0,
+          0,
+          {
+            from: owner,
+          }
+        ),
+        'MarketplaceV2#constructor: INVALID_OWNER'
+      )
     })
 
     it('should revert if fees collector is invalid', async function() {
-      await Marketplace.new(
-        owner,
-        zeroAddress,
-        erc20.address,
-        royaltiesManager.address,
-        0,
-        0,
-        {
-          from: owner,
-        }
-      ).should.be.rejectedWith(EVMRevert)
+      await assertRevert(
+        Marketplace.new(
+          owner,
+          zeroAddress,
+          erc20.address,
+          royaltiesManager.address,
+          0,
+          0,
+          {
+            from: owner,
+          }
+        ),
+        'MarketplaceV2#setFeesCollector: INVALID_FEES_COLLECTOR'
+      )
     })
 
     it('should revert if accepted token is invalid', async function() {
-      await Marketplace.new(
-        owner,
-        feesCollector,
-        zeroAddress,
-        royaltiesManager.address,
-        0,
-        0,
-        {
-          from: owner,
-        }
-      ).should.be.rejectedWith(EVMRevert)
+      await assertRevert(
+        Marketplace.new(
+          owner,
+          feesCollector,
+          zeroAddress,
+          royaltiesManager.address,
+          0,
+          0,
+          {
+            from: owner,
+          }
+        ),
+        'MarketplaceV2#constructor: INVALID_ACCEPTED_TOKEN'
+      )
     })
 
     it('should revert if royalties manager is invalid', async function() {
-      await Marketplace.new(
-        owner,
-        feesCollector,
-        erc20.address,
-        zeroAddress,
-        0,
-        0,
-        {
-          from: owner,
-        }
-      ).should.be.rejectedWith(EVMRevert)
+      await assertRevert(
+        Marketplace.new(
+          owner,
+          feesCollector,
+          erc20.address,
+          zeroAddress,
+          0,
+          0,
+          {
+            from: owner,
+          }
+        ),
+        'MarketplaceV2#setRoyaltiesManager: INVALID_ROYALTIES_MANAGER'
+      )
     })
 
     it('should revert if fee is invalid', async function() {
-      await Marketplace.new(
-        owner,
-        feesCollector,
-        erc20.address,
-        royaltiesManager.address,
-        1000000,
-        0,
-        {
-          from: owner,
-        }
-      ).should.be.rejectedWith(EVMRevert)
+      await assertRevert(
+        Marketplace.new(
+          owner,
+          feesCollector,
+          erc20.address,
+          royaltiesManager.address,
+          1000000,
+          0,
+          {
+            from: owner,
+          }
+        ),
+        'MarketplaceV2#setFeesCollectorCutPerMillion: TOTAL_FEES_MUST_BE_BETWEEN_0_AND_999999'
+      )
     })
 
     it('should revert if royalties is invalid', async function() {
-      await Marketplace.new(
-        owner,
-        feesCollector,
-        erc20.address,
-        royaltiesManager.address,
-        0,
-        1000000,
-        {
-          from: owner,
-        }
-      ).should.be.rejectedWith(EVMRevert)
+      await assertRevert(
+        Marketplace.new(
+          owner,
+          feesCollector,
+          erc20.address,
+          royaltiesManager.address,
+          0,
+          1000000,
+          {
+            from: owner,
+          }
+        ),
+        'MarketplaceV2#setRoyaltiesCutPerMillion: TOTAL_FEES_MUST_BE_BETWEEN_0_AND_999999'
+      )
     })
 
     it('should revert if the sum of the fees and royalties are invalid', async function() {
-      await Marketplace.new(
-        owner,
-        feesCollector,
-        erc20.address,
-        royaltiesManager.address,
-        1,
-        999999,
-        {
-          from: owner,
-        }
-      ).should.be.rejectedWith(EVMRevert)
+      await assertRevert(
+        Marketplace.new(
+          owner,
+          feesCollector,
+          erc20.address,
+          royaltiesManager.address,
+          1,
+          999999,
+          {
+            from: owner,
+          }
+        ),
+        'MarketplaceV2#setRoyaltiesCutPerMillion: TOTAL_FEES_MUST_BE_BETWEEN_0_AND_999999'
+      )
 
-      await Marketplace.new(
-        owner,
-        feesCollector,
-        erc20.address,
-        royaltiesManager.address,
-        500000,
-        500000,
-        {
-          from: owner,
-        }
-      ).should.be.rejectedWith(EVMRevert)
+      await assertRevert(
+        Marketplace.new(
+          owner,
+          feesCollector,
+          erc20.address,
+          royaltiesManager.address,
+          500000,
+          500000,
+          {
+            from: owner,
+          }
+        ),
+        'MarketplaceV2#setRoyaltiesCutPerMillion: TOTAL_FEES_MUST_BE_BETWEEN_0_AND_999999'
+      )
     })
   })
 
@@ -620,15 +645,20 @@ contract('Marketplace V2', function([
       const newAssetId = 123123123
       await erc721.mint(otherAddress, newAssetId)
 
-      await createOrder(erc721.address, newAssetId, itemPrice, endTime, {
-        from: seller,
-      }).should.be.rejectedWith(EVMRevert)
+      await assertRevert(
+        createOrder(erc721.address, newAssetId, itemPrice, endTime, {
+          from: seller,
+        })
+      )
     })
 
     it('should fail to create an order :: (address not the owner of asset)', async function() {
-      await createOrder(erc721.address, assetId, itemPrice, endTime, {
-        from: otherAddress,
-      }).should.be.rejectedWith(EVMRevert)
+      await assertRevert(
+        createOrder(erc721.address, assetId, itemPrice, endTime, {
+          from: otherAddress,
+        }),
+        'MarketplaceV2#_createOrder: NOT_ASSET_OWNER'
+      )
     })
 
     it('should fail to create an order :: (address not the owner of asset) :: Relayed EIP721', async function() {
@@ -664,50 +694,57 @@ contract('Marketplace V2', function([
         [erc721.address, assetId, itemPrice, endTime]
       )
 
-      await sendMetaTx(
-        market,
-        functionSignature,
-        otherAddress,
-        relayer,
-        null,
-        domain,
-        version
-      ).should.be.rejectedWith(EVMRevert)
+      await assertRevert(
+        sendMetaTx(
+          market,
+          functionSignature,
+          otherAddress,
+          relayer,
+          null,
+          domain,
+          version
+        )
+      )
     })
 
     it('should fail to create an order :: (price is 0)', async function() {
-      await market
-        .createOrder(erc721.address, assetId, 0, endTime, { from: seller })
-        .should.be.rejectedWith(EVMRevert)
+      await assertRevert(
+        market.createOrder(erc721.address, assetId, 0, endTime, {
+          from: seller,
+        }),
+        EVMRevert
+      )
     })
 
     it('should fail to create an order :: (expires too soon)', async function() {
       const newTime =
         (await web3.eth.getBlock('latest')).timestamp + duration.seconds(59)
-      await market
-        .createOrder(erc721.address, assetId, itemPrice, newTime, {
+      await assertRevert(
+        market.createOrder(erc721.address, assetId, itemPrice, newTime, {
           from: seller,
-        })
-        .should.be.rejectedWith(EVMRevert)
+        }),
+        'MarketplaceV2#_createOrder: INVALID_EXPIRES_AT'
+      )
     })
 
     it('should fail to create an order :: (nft not approved)', async function() {
       await erc721.setApprovalForAll(market.address, false, { from: seller })
-      await market
-        .createOrder(erc721.address, assetId, itemPrice, endTime, {
+      await assertRevert(
+        market.createOrder(erc721.address, assetId, itemPrice, endTime, {
           from: seller,
         })
-        .should.be.rejectedWith(EVMRevert)
+      )
     })
 
     it('should fail to create an order :: (publication fee not paid)', async function() {
       await erc20.approve(market.address, 1, { from: seller })
       await market.setPublicationFee(2, { from: owner })
-      await market
-        .createOrder(erc721.address, assetId, itemPrice, endTime, {
+      await assertRevert(
+        market.createOrder(erc721.address, assetId, itemPrice, endTime, {
           from: seller,
-        })
-        .should.be.rejectedWith(EVMRevert)
+        }),
+        'ERC20: transfer amount exceeds allowance'
+      )
     })
   })
 
@@ -822,9 +859,12 @@ contract('Marketplace V2', function([
       await createOrder(erc721.address, assetId, itemPrice, endTime, {
         from: seller,
       })
-      await cancelOrder(erc721.address, assetId, {
-        from: buyer,
-      }).should.be.rejectedWith(EVMRevert)
+      await assertRevert(
+        cancelOrder(erc721.address, assetId, {
+          from: buyer,
+        }),
+        'MarketplaceV2#_cancelOrder: UNAUTHORIZED_USER'
+      )
     })
 
     it('should fail canceling an order :: (wrong user) :: Relayed EIP721', async function() {
@@ -854,24 +894,29 @@ contract('Marketplace V2', function([
         [erc721.address, assetId]
       )
 
-      await sendMetaTx(
-        market,
-        functionSignature,
-        buyer,
-        relayer,
-        null,
-        domain,
-        version
-      ).should.be.rejectedWith(EVMRevert)
+      await assertRevert(
+        sendMetaTx(
+          market,
+          functionSignature,
+          buyer,
+          relayer,
+          null,
+          domain,
+          version
+        )
+      )
     })
 
     it('should fail canceling an order :: (wrong NFT address)', async function() {
       await createOrder(erc721.address, assetId, itemPrice, endTime, {
         from: seller,
       })
-      await cancelOrder(erc20.address, assetId, {
-        from: seller,
-      }).should.be.rejectedWith(EVMRevert)
+      await assertRevert(
+        cancelOrder(erc20.address, assetId, {
+          from: seller,
+        }),
+        'MarketplaceV2#_cancelOrder: INVALID_ORDER'
+      )
     })
 
     it('should fail canceling an order :: (double cancel)', async function() {
@@ -880,9 +925,12 @@ contract('Marketplace V2', function([
       })
       await cancelOrder(erc721.address, assetId, { from: seller })
 
-      await cancelOrder(erc721.address, assetId, {
-        from: seller,
-      }).should.be.rejectedWith(EVMRevert)
+      await assertRevert(
+        cancelOrder(erc721.address, assetId, {
+          from: seller,
+        }),
+        'MarketplaceV2#_cancelOrder: INVALID_ORDER'
+      )
     })
   })
 
@@ -965,9 +1013,12 @@ contract('Marketplace V2', function([
         from: seller,
       })
 
-      await executeOrder(erc721.address, assetId, itemPrice, {
-        from: seller,
-      }).should.be.rejectedWith(EVMRevert)
+      await assertRevert(
+        executeOrder(erc721.address, assetId, itemPrice, {
+          from: seller,
+        }),
+        'MarketplaceV2#_executeOrder: SENDER_IS_SELLER'
+      )
     })
 
     it('should fail on execute a created order :: (wrong NFT address)', async function() {
@@ -983,9 +1034,12 @@ contract('Marketplace V2', function([
 
       // move an hour ahead
       await increaseTime(3600)
-      await executeOrder(erc721.address, assetId, itemPrice, {
-        from: buyer,
-      }).should.be.rejectedWith(EVMRevert)
+      await assertRevert(
+        executeOrder(erc721.address, assetId, itemPrice, {
+          from: buyer,
+        }),
+        'MarketplaceV2#_executeOrder: ORDER_EXPIRED'
+      )
     })
 
     it('should fail on execute a created order :: (double execute)', async function() {
@@ -996,9 +1050,12 @@ contract('Marketplace V2', function([
         from: buyer,
       })
 
-      await executeOrder(erc721.address, assetId, itemPrice, {
-        from: buyer,
-      }).should.be.rejectedWith(EVMRevert)
+      await assertRevert(
+        executeOrder(erc721.address, assetId, itemPrice, {
+          from: buyer,
+        }),
+        'MarketplaceV2#_executeOrder: ASSET_NOT_FOR_SALE'
+      )
     })
 
     it('should fail to execute a created order :: (not an ERC721 contract)', async function() {
@@ -1101,8 +1158,8 @@ contract('Marketplace V2', function([
         from: seller,
       })
 
-      await market
-        .safeExecuteOrder(
+      await assertRevert(
+        market.safeExecuteOrder(
           verifiableErc721.address,
           assetId,
           itemPrice,
@@ -1110,8 +1167,9 @@ contract('Marketplace V2', function([
           {
             from: seller,
           }
-        )
-        .should.be.rejectedWith(EVMRevert)
+        ),
+        'MarketplaceV2#_executeOrder: INVALID_FINGERPRINT'
+      )
     })
 
     it('should fail on execute a created order :: (wrong user)', async function() {
@@ -1119,26 +1177,28 @@ contract('Marketplace V2', function([
         from: seller,
       })
 
-      await market
-        .safeExecuteOrder(
+      await assertRevert(
+        market.safeExecuteOrder(
           verifiableErc721.address,
           assetId,
           itemPrice,
           fingerprint,
           { from: seller }
-        )
-        .should.be.rejectedWith(EVMRevert)
+        ),
+        'MarketplaceV2#_executeOrder: SENDER_IS_SELLER'
+      )
     })
 
     it('should fail on unsafe executeOrder :: (verifiable NFT registry)', async function() {
       await createOrder(verifiableErc721.address, assetId, itemPrice, endTime, {
         from: seller,
       })
-      await market
-        .executeOrder(verifiableErc721.address, assetId, itemPrice, {
+      await assertRevert(
+        market.executeOrder(verifiableErc721.address, assetId, itemPrice, {
           from: buyer,
-        })
-        .should.be.rejectedWith(EVMRevert)
+        }),
+        'MarketplaceV2#_executeOrder: INVALID_FINGERPRINT'
+      )
     })
 
     it('should fail execute a created order :: (expired)', async function() {
@@ -1148,15 +1208,16 @@ contract('Marketplace V2', function([
 
       // move an hour ahead
       await increaseTime(3600)
-      await market
-        .safeExecuteOrder(
+      await assertRevert(
+        market.safeExecuteOrder(
           verifiableErc721.address,
           assetId,
           itemPrice,
           fingerprint,
           { from: buyer }
-        )
-        .should.be.rejectedWith(EVMRevert)
+        ),
+        'MarketplaceV2#_executeOrder: ORDER_EXPIRED'
+      )
     })
   })
 
@@ -1227,9 +1288,10 @@ contract('Marketplace V2', function([
     it('should fail to change publication fee (not owner)', async function() {
       const publicationFee = web3.utils.toWei('0.005', 'ether')
 
-      await market
-        .setPublicationFee(publicationFee, { from: seller })
-        .should.be.rejectedWith(EVMRevert)
+      await assertRevert(
+        market.setPublicationFee(publicationFee, { from: seller }),
+        'Ownable: caller is not the owner'
+      )
     })
 
     it('should fail to change publication fee (not owner) :: Relayed EIP721', async function() {
@@ -1252,15 +1314,17 @@ contract('Marketplace V2', function([
         [publicationFee]
       )
 
-      await sendMetaTx(
-        market,
-        functionSignature,
-        seller,
-        relayer,
-        null,
-        domain,
-        version
-      ).should.be.rejectedWith(EVMRevert)
+      await assertRevert(
+        sendMetaTx(
+          market,
+          functionSignature,
+          seller,
+          relayer,
+          null,
+          domain,
+          version
+        )
+      )
     })
   })
 
@@ -1329,15 +1393,17 @@ contract('Marketplace V2', function([
     })
 
     it('should fail to change fee collector address zero', async function() {
-      await market
-        .setFeesCollector(zeroAddress, { from: owner })
-        .should.be.rejectedWith(EVMRevert)
+      await assertRevert(
+        market.setFeesCollector(zeroAddress, { from: owner }),
+        'MarketplaceV2#setFeesCollector: INVALID_FEES_COLLECTOR'
+      )
     })
 
     it('should fail to change fee collector (not owner)', async function() {
-      await market
-        .setFeesCollector(anotherUser, { from: seller })
-        .should.be.rejectedWith(EVMRevert)
+      await assertRevert(
+        market.setFeesCollector(anotherUser, { from: seller }),
+        'Ownable: caller is not the owner'
+      )
     })
 
     it('should fail to change fee collector (not owner) :: Relayed EIP721', async function() {
@@ -1358,15 +1424,17 @@ contract('Marketplace V2', function([
         [anotherUser]
       )
 
-      await sendMetaTx(
-        market,
-        functionSignature,
-        seller,
-        relayer,
-        null,
-        domain,
-        version
-      ).should.be.rejectedWith(EVMRevert)
+      await assertRevert(
+        sendMetaTx(
+          market,
+          functionSignature,
+          seller,
+          relayer,
+          null,
+          domain,
+          version
+        )
+      )
     })
   })
 
@@ -1443,21 +1511,24 @@ contract('Marketplace V2', function([
     })
 
     it('should fail to change royalties manager address zero', async function() {
-      await market
-        .setRoyaltiesManager(zeroAddress, { from: owner })
-        .should.be.rejectedWith(EVMRevert)
+      await assertRevert(
+        market.setRoyaltiesManager(zeroAddress, { from: owner }),
+        'MarketplaceV2#setRoyaltiesManager: INVALID_ROYALTIES_MANAGER'
+      )
     })
 
     it('should fail to change royalties manager to a not contract', async function() {
-      await market
-        .setRoyaltiesManager(anotherUser, { from: owner })
-        .should.be.rejectedWith(EVMRevert)
+      await assertRevert(
+        market.setRoyaltiesManager(anotherUser, { from: owner }),
+        'MarketplaceV2#setRoyaltiesManager: INVALID_ROYALTIES_MANAGER'
+      )
     })
 
     it('should fail to change royalties manager (not owner)', async function() {
-      await market
-        .setRoyaltiesManager(erc721.address, { from: seller })
-        .should.be.rejectedWith(EVMRevert)
+      await assertRevert(
+        market.setRoyaltiesManager(erc721.address, { from: seller }),
+        'Ownable: caller is not the owner'
+      )
     })
 
     it('should fail to change royalties manager (not owner) :: Relayed EIP721', async function() {
@@ -1478,15 +1549,17 @@ contract('Marketplace V2', function([
         [anotherUser]
       )
 
-      await sendMetaTx(
-        market,
-        functionSignature,
-        seller,
-        relayer,
-        null,
-        domain,
-        version
-      ).should.be.rejectedWith(EVMRevert)
+      await assertRevert(
+        sendMetaTx(
+          market,
+          functionSignature,
+          seller,
+          relayer,
+          null,
+          domain,
+          version
+        )
+      )
     })
   })
 
@@ -1557,25 +1630,30 @@ contract('Marketplace V2', function([
     })
 
     it('should fail to change fee collector cut (% invalid above)', async function() {
-      await market
-        .setFeesCollectorCutPerMillion(10000000, { from: owner })
-        .should.be.rejectedWith(EVMRevert)
+      await assertRevert(
+        market.setFeesCollectorCutPerMillion(10000000, { from: owner }),
+        'MarketplaceV2#setFeesCollectorCutPerMillion: TOTAL_FEES_MUST_BE_BETWEEN_0_AND_999999'
+      )
     })
 
     it('should fail to change fee collector cut (% invalid above along with royalties cut)', async function() {
       await market.setRoyaltiesCutPerMillion(1, { from: owner })
 
-      await market
-        .setFeesCollectorCutPerMillion(999999, { from: owner })
-        .should.be.rejectedWith(EVMRevert)
+      await assertRevert(
+        market.setFeesCollectorCutPerMillion(999999, { from: owner }),
+        'MarketplaceV2#setFeesCollectorCutPerMillion: TOTAL_FEES_MUST_BE_BETWEEN_0_AND_999999'
+      )
     })
 
     it('should fail to change fee collector cut (not owner)', async function() {
       const feesCollectorCut = 10
 
-      await market
-        .setFeesCollectorCutPerMillion(feesCollectorCut, { from: seller })
-        .should.be.rejectedWith(EVMRevert)
+      await assertRevert(
+        market.setFeesCollectorCutPerMillion(feesCollectorCut, {
+          from: seller,
+        }),
+        'Ownable: caller is not the owner'
+      )
     })
 
     it('should fail to change fee collector cut (not owner) :: Relayed EIP721', async function() {
@@ -1598,15 +1676,17 @@ contract('Marketplace V2', function([
         [feesCollectorCut]
       )
 
-      await sendMetaTx(
-        market,
-        functionSignature,
-        seller,
-        relayer,
-        null,
-        domain,
-        version
-      ).should.be.rejectedWith(EVMRevert)
+      await assertRevert(
+        sendMetaTx(
+          market,
+          functionSignature,
+          seller,
+          relayer,
+          null,
+          domain,
+          version
+        )
+      )
     })
   })
 
@@ -1674,25 +1754,28 @@ contract('Marketplace V2', function([
     })
 
     it('should fail to change royalties cut (% invalid above)', async function() {
-      await market
-        .setRoyaltiesCutPerMillion(10000000, { from: owner })
-        .should.be.rejectedWith(EVMRevert)
+      await assertRevert(
+        market.setRoyaltiesCutPerMillion(10000000, { from: owner }),
+        'MarketplaceV2#setRoyaltiesCutPerMillion: TOTAL_FEES_MUST_BE_BETWEEN_0_AND_999999'
+      )
     })
 
     it('should fail to change royalties cut (% invalid above along with fee collector cut)', async function() {
       await market.setFeesCollectorCutPerMillion(1, { from: owner })
 
-      await market
-        .setRoyaltiesCutPerMillion(999999, { from: owner })
-        .should.be.rejectedWith(EVMRevert)
+      await assertRevert(
+        market.setRoyaltiesCutPerMillion(999999, { from: owner }),
+        'MarketplaceV2#setRoyaltiesCutPerMillion: TOTAL_FEES_MUST_BE_BETWEEN_0_AND_999999'
+      )
     })
 
     it('should fail to change royalties cut (not owner)', async function() {
       const royaltiesCut = 10
 
-      await market
-        .setRoyaltiesCutPerMillion(royaltiesCut, { from: seller })
-        .should.be.rejectedWith(EVMRevert)
+      await assertRevert(
+        market.setRoyaltiesCutPerMillion(royaltiesCut, { from: seller }),
+        'Ownable: caller is not the owner'
+      )
     })
 
     it('should fail to change royalties cut (not owner) :: Relayed EIP721', async function() {
@@ -1715,15 +1798,17 @@ contract('Marketplace V2', function([
         [royaltiesCut]
       )
 
-      await sendMetaTx(
-        market,
-        functionSignature,
-        seller,
-        relayer,
-        null,
-        domain,
-        version
-      ).should.be.rejectedWith(EVMRevert)
+      await assertRevert(
+        sendMetaTx(
+          market,
+          functionSignature,
+          seller,
+          relayer,
+          null,
+          domain,
+          version
+        )
+      )
     })
   })
 
