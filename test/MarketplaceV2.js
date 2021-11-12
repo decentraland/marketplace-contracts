@@ -2263,7 +2263,7 @@ contract('Marketplace V2', function([
       buyerBalance.should.be.eq.BN(web3.utils.toWei('9.0', 'ether'))
     })
 
-    it('should sell and no compute royalties if the receiver is the zero address', async function() {
+    it('should sell and send to fees collector if the royalties receiver is the zero address', async function() {
       await erc721Collection.setCreator(zeroAddress)
       await erc721Collection.setBeneficiary(zeroAddress)
 
@@ -2294,7 +2294,7 @@ contract('Marketplace V2', function([
 
       // Verify balances
       let feesCollectorBalance = await erc20.balanceOf(feesCollector)
-      feesCollectorBalance.should.be.eq.BN(web3.utils.toWei('10.0', 'ether'))
+      feesCollectorBalance.should.be.eq.BN(web3.utils.toWei('10.1', 'ether'))
 
       let itemCreatorBalance = await erc20.balanceOf(itemCreator)
       itemCreatorBalance.should.be.eq.BN(web3.utils.toWei('10.0', 'ether'))
@@ -2303,13 +2303,13 @@ contract('Marketplace V2', function([
       itemBeneficiaryBalance.should.be.eq.BN(web3.utils.toWei('10.0', 'ether'))
 
       let sellerBalance = await erc20.balanceOf(seller)
-      sellerBalance.should.be.eq.BN(web3.utils.toWei('11.0', 'ether'))
+      sellerBalance.should.be.eq.BN(web3.utils.toWei('10.9', 'ether'))
 
       let buyerBalance = await erc20.balanceOf(buyer)
       buyerBalance.should.be.eq.BN(web3.utils.toWei('9.0', 'ether'))
     })
 
-    it('should sell and compute only fees collector cut if royalties beneficiary is the zero address', async function() {
+    it('should sell and compute both fees collector and royalties cut to the fees collector if royalties beneficiary is the zero address', async function() {
       await erc721Collection.setCreator(zeroAddress)
       await erc721Collection.setBeneficiary(zeroAddress)
 
@@ -2343,7 +2343,7 @@ contract('Marketplace V2', function([
 
       // Verify balances
       let feesCollectorBalance = await erc20.balanceOf(feesCollector)
-      feesCollectorBalance.should.be.eq.BN(web3.utils.toWei('10.1', 'ether'))
+      feesCollectorBalance.should.be.eq.BN(web3.utils.toWei('10.2', 'ether'))
 
       let itemCreatorBalance = await erc20.balanceOf(itemCreator)
       itemCreatorBalance.should.be.eq.BN(web3.utils.toWei('10.0', 'ether'))
@@ -2352,13 +2352,13 @@ contract('Marketplace V2', function([
       itemBeneficiaryBalance.should.be.eq.BN(web3.utils.toWei('10.0', 'ether'))
 
       let sellerBalance = await erc20.balanceOf(seller)
-      sellerBalance.should.be.eq.BN(web3.utils.toWei('10.9', 'ether'))
+      sellerBalance.should.be.eq.BN(web3.utils.toWei('10.8', 'ether'))
 
       let buyerBalance = await erc20.balanceOf(buyer)
       buyerBalance.should.be.eq.BN(web3.utils.toWei('9.0', 'ether'))
     })
 
-    it('should sell and compute only fees collector cut if the NFT is not a collection interface compliant', async function() {
+    it('should sell and compute both fees collector and royalties cut to the fees collector if the NFT is not a collection interface compliant', async function() {
       await erc721Collection.setCreator(itemCreator)
       await erc721Collection.setBeneficiary(itemBeneficiary)
 
@@ -2392,7 +2392,7 @@ contract('Marketplace V2', function([
 
       // Verify balances
       let feesCollectorBalance = await erc20.balanceOf(feesCollector)
-      feesCollectorBalance.should.be.eq.BN(web3.utils.toWei('10.1', 'ether'))
+      feesCollectorBalance.should.be.eq.BN(web3.utils.toWei('10.2', 'ether'))
 
       let itemCreatorBalance = await erc20.balanceOf(itemCreator)
       itemCreatorBalance.should.be.eq.BN(web3.utils.toWei('10.0', 'ether'))
@@ -2401,13 +2401,13 @@ contract('Marketplace V2', function([
       itemBeneficiaryBalance.should.be.eq.BN(web3.utils.toWei('10.0', 'ether'))
 
       let sellerBalance = await erc20.balanceOf(seller)
-      sellerBalance.should.be.eq.BN(web3.utils.toWei('10.9', 'ether'))
+      sellerBalance.should.be.eq.BN(web3.utils.toWei('10.8', 'ether'))
 
       let buyerBalance = await erc20.balanceOf(buyer)
       buyerBalance.should.be.eq.BN(web3.utils.toWei('9.0', 'ether'))
     })
 
-    it('should sell and compute only fees collector cut if royalties manager is invalid (not collection compliant)', async function() {
+    it('should sell and compute both fees collector and royalties cut to the fees collector if royalties manager is invalid (not collection compliant)', async function() {
       await erc721Collection.setCreator(itemCreator)
       await erc721Collection.setBeneficiary(itemBeneficiary)
 
@@ -2443,7 +2443,7 @@ contract('Marketplace V2', function([
 
       // Verify balances
       let feesCollectorBalance = await erc20.balanceOf(feesCollector)
-      feesCollectorBalance.should.be.eq.BN(web3.utils.toWei('10.1', 'ether'))
+      feesCollectorBalance.should.be.eq.BN(web3.utils.toWei('10.2', 'ether'))
 
       let itemCreatorBalance = await erc20.balanceOf(itemCreator)
       itemCreatorBalance.should.be.eq.BN(web3.utils.toWei('10.0', 'ether'))
@@ -2452,13 +2452,13 @@ contract('Marketplace V2', function([
       itemBeneficiaryBalance.should.be.eq.BN(web3.utils.toWei('10.0', 'ether'))
 
       let sellerBalance = await erc20.balanceOf(seller)
-      sellerBalance.should.be.eq.BN(web3.utils.toWei('10.9', 'ether'))
+      sellerBalance.should.be.eq.BN(web3.utils.toWei('10.8', 'ether'))
 
       let buyerBalance = await erc20.balanceOf(buyer)
       buyerBalance.should.be.eq.BN(web3.utils.toWei('9.0', 'ether'))
     })
 
-    it('should sell and compute only fees collector cut if royalties manager is invalid (collection compliant)', async function() {
+    it('should sell and compute both fees collector and royalties cut to the fees collector if royalties manager is invalid (collection compliant)', async function() {
       await erc721Collection.setCreator(itemCreator)
       await erc721Collection.setBeneficiary(itemBeneficiary)
 
@@ -2494,7 +2494,7 @@ contract('Marketplace V2', function([
 
       // Verify balances
       let feesCollectorBalance = await erc20.balanceOf(feesCollector)
-      feesCollectorBalance.should.be.eq.BN(web3.utils.toWei('10.1', 'ether'))
+      feesCollectorBalance.should.be.eq.BN(web3.utils.toWei('10.2', 'ether'))
 
       let itemCreatorBalance = await erc20.balanceOf(itemCreator)
       itemCreatorBalance.should.be.eq.BN(web3.utils.toWei('10.0', 'ether'))
@@ -2503,7 +2503,7 @@ contract('Marketplace V2', function([
       itemBeneficiaryBalance.should.be.eq.BN(web3.utils.toWei('10.0', 'ether'))
 
       let sellerBalance = await erc20.balanceOf(seller)
-      sellerBalance.should.be.eq.BN(web3.utils.toWei('10.9', 'ether'))
+      sellerBalance.should.be.eq.BN(web3.utils.toWei('10.8', 'ether'))
 
       let buyerBalance = await erc20.balanceOf(buyer)
       buyerBalance.should.be.eq.BN(web3.utils.toWei('9.0', 'ether'))
@@ -2553,6 +2553,46 @@ contract('Marketplace V2', function([
 
       let sellerBalance = await erc20.balanceOf(seller)
       sellerBalance.should.be.eq.BN(web3.utils.toWei('10.8', 'ether'))
+
+      let buyerBalance = await erc20.balanceOf(buyer)
+      buyerBalance.should.be.eq.BN(web3.utils.toWei('9.0', 'ether'))
+    })
+    it('should sell without fees', async function() {
+      await erc721Collection.setCreator(itemCreator)
+      await erc721Collection.setBeneficiary(itemBeneficiary)
+
+      let balance = await erc20.balanceOf(seller)
+      await erc20.transfer(otherAddress, balance, { from: seller })
+
+      balance = await erc20.balanceOf(buyer)
+      await erc20.transfer(otherAddress, balance, { from: buyer })
+
+      // Set token balances
+      await erc20.setBalance(feesCollector, web3.utils.toWei('10.0', 'ether'))
+      await erc20.setBalance(buyer, web3.utils.toWei('10.0', 'ether'))
+      await erc20.setBalance(seller, web3.utils.toWei('10.0', 'ether'))
+      await erc20.setBalance(itemCreator, web3.utils.toWei('10.0', 'ether'))
+      await erc20.setBalance(itemBeneficiary, web3.utils.toWei('10.0', 'ether'))
+
+      await createOrder(erc721Collection.address, assetId, itemPrice, endTime, {
+        from: seller,
+      })
+      await executeOrder(erc721Collection.address, assetId, itemPrice, {
+        from: buyer,
+      })
+
+      // Verify balances
+      let feesCollectorBalance = await erc20.balanceOf(feesCollector)
+      feesCollectorBalance.should.be.eq.BN(web3.utils.toWei('10.0', 'ether'))
+
+      let itemCreatorBalance = await erc20.balanceOf(itemCreator)
+      itemCreatorBalance.should.be.eq.BN(web3.utils.toWei('10.0', 'ether'))
+
+      let itemBeneficiaryBalance = await erc20.balanceOf(itemBeneficiary)
+      itemBeneficiaryBalance.should.be.eq.BN(web3.utils.toWei('10.0', 'ether'))
+
+      let sellerBalance = await erc20.balanceOf(seller)
+      sellerBalance.should.be.eq.BN(web3.utils.toWei('11.0', 'ether'))
 
       let buyerBalance = await erc20.balanceOf(buyer)
       buyerBalance.should.be.eq.BN(web3.utils.toWei('9.0', 'ether'))

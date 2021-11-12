@@ -392,19 +392,12 @@ contract MarketplaceV2 is Ownable, Pausable, NativeMetaTransaction {
 
     uint256 feesCollectorShareAmount;
     uint256 royaltiesShareAmount;
-
-    // Fees collector share
-    if (feesCollectorCutPerMillion > 0 && feesCollector != address(0)) {
-      feesCollectorShareAmount = (price * feesCollectorCutPerMillion) / 1000000;
-
-      require(
-        acceptedToken.transferFrom(sender, feesCollector, feesCollectorShareAmount),
-        "MarketplaceV2#_executeOrder: TRANSFER_FEES_TO_FEES_COLLECTOR_FAILED"
-      );
-    }
+    address royaltiesReceiver;
 
     // Royalties share
     if (royaltiesCutPerMillion > 0) {
+      royaltiesShareAmount = (price * royaltiesCutPerMillion) / 1000000;
+
       (bool success, bytes memory res) = address(royaltiesManager).staticcall(
         abi.encodeWithSelector(
             royaltiesManager.getRoyaltiesReceiver.selector,
@@ -414,10 +407,8 @@ contract MarketplaceV2 is Ownable, Pausable, NativeMetaTransaction {
       );
 
       if (success) {
-        (address royaltiesReceiver) = abi.decode(res, (address));
+        (royaltiesReceiver) = abi.decode(res, (address));
         if (royaltiesReceiver != address(0)) {
-          royaltiesShareAmount = (price * royaltiesCutPerMillion) / 1000000;
-
           require(
             acceptedToken.transferFrom(sender, royaltiesReceiver, royaltiesShareAmount),
             "MarketplaceV2#_executeOrder: TRANSFER_FEES_TO_ROYALTIES_RECEIVER_FAILED"
@@ -426,9 +417,26 @@ contract MarketplaceV2 is Ownable, Pausable, NativeMetaTransaction {
       }
     }
 
+    // Fees collector share
+    {
+      feesCollectorShareAmount = (price * feesCollectorCutPerMillion) / 1000000;
+      uint256 totalFeeCollectorShareAmount = feesCollectorShareAmount;
+
+      if (royaltiesShareAmount > 0 && royaltiesReceiver == address(0)) {
+        totalFeeCollectorShareAmount += royaltiesShareAmount;
+      }
+
+      if (totalFeeCollectorShareAmount > 0) {
+        require(
+          acceptedToken.transferFrom(sender, feesCollector, totalFeeCollectorShareAmount),
+          "MarketplaceV2#_executeOrder: TRANSFER_FEES_TO_FEES_COLLECTOR_FAILED"
+        );
+      }
+    }
+
     // Transfer sale amount to seller
     require(
-      acceptedToken.transferFrom(sender, order.seller, price - feesCollectorShareAmount - royaltiesShareAmount),
+      acceptedToken.transferFrom(sender, order.seller, price - royaltiesShareAmount - feesCollectorShareAmount),
       "MarketplaceV2#_executeOrder: TRANSFER_AMOUNT_TO_SELLER_FAILED"
     );
 
