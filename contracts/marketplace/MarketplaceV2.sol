@@ -133,7 +133,10 @@ contract MarketplaceV2 is Ownable, Pausable, NativeMetaTransaction {
   function setFeesCollectorCutPerMillion(uint256 _feesCollectorCutPerMillion) public onlyOwner {
     feesCollectorCutPerMillion = _feesCollectorCutPerMillion;
 
-    require(feesCollectorCutPerMillion + royaltiesCutPerMillion < 1000000, "MarketplaceV2#setFeesCollectorCutPerMillion: TOTAL_FEES_MUST_BE_BETWEEN_0_AND_999999");
+    require(
+      feesCollectorCutPerMillion + royaltiesCutPerMillion < 1000000,
+      "MarketplaceV2#setFeesCollectorCutPerMillion: TOTAL_FEES_MUST_BE_BETWEEN_0_AND_999999"
+    );
 
     emit ChangedFeesCollectorCutPerMillion(feesCollectorCutPerMillion);
   }
@@ -146,7 +149,10 @@ contract MarketplaceV2 is Ownable, Pausable, NativeMetaTransaction {
   function setRoyaltiesCutPerMillion(uint256 _royaltiesCutPerMillion) public onlyOwner {
     royaltiesCutPerMillion = _royaltiesCutPerMillion;
 
-    require(feesCollectorCutPerMillion + royaltiesCutPerMillion < 1000000, "MarketplaceV2#setRoyaltiesCutPerMillion: TOTAL_FEES_MUST_BE_BETWEEN_0_AND_999999");
+    require(
+      feesCollectorCutPerMillion + royaltiesCutPerMillion < 1000000,
+      "MarketplaceV2#setRoyaltiesCutPerMillion: TOTAL_FEES_MUST_BE_BETWEEN_0_AND_999999"
+    );
 
     emit ChangedRoyaltiesCutPerMillion(royaltiesCutPerMillion);
   }

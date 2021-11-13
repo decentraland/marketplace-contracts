@@ -1095,6 +1095,80 @@ contract('Marketplace V2', function([
         'MarketplaceV2#_executeOrder: SELLER_NOT_OWNER'
       )
     })
+
+    it('should fail on execute a created order :: (cant pay for order)', async function() {
+      const balance = await erc20.balanceOf(buyer)
+      await erc20.transfer(owner, balance, { from: buyer })
+      await erc20.setBalance(buyer, web3.utils.toWei('9.9', 'ether'))
+
+      await createOrder(
+        erc721.address,
+        assetId,
+        web3.utils.toWei('10', 'ether'),
+        endTime,
+        {
+          from: seller,
+        }
+      )
+
+      await assertRevert(
+        executeOrder(erc721.address, assetId, web3.utils.toWei('10', 'ether'), {
+          from: buyer,
+        }),
+        'ERC20: transfer amount exceeds balance'
+      )
+    })
+
+    it('should fail on execute a created order :: (cant pay for collector fees)', async function() {
+      const balance = await erc20.balanceOf(buyer)
+      await erc20.transfer(owner, balance, { from: buyer })
+      await erc20.setBalance(buyer, web3.utils.toWei('0', 'ether'))
+
+      await market.setFeesCollectorCutPerMillion(10000, { from: owner })
+
+      await createOrder(
+        erc721.address,
+        assetId,
+        web3.utils.toWei('10.0', 'ether'),
+        endTime,
+        {
+          from: seller,
+        }
+      )
+
+      await assertRevert(
+        executeOrder(erc721.address, assetId, web3.utils.toWei('10', 'ether'), {
+          from: buyer,
+        }),
+        'ERC20: transfer amount exceeds balance'
+      )
+    })
+
+    it('should fail on execute a created order :: (cant pay for royalties fees)', async function() {
+      const balance = await erc20.balanceOf(buyer)
+      await erc20.transfer(owner, balance, { from: buyer })
+      await erc20.setBalance(buyer, web3.utils.toWei('1', 'ether'))
+
+      await market.setFeesCollectorCutPerMillion(10000, { from: owner })
+      await market.setRoyaltiesCutPerMillion(10000, { from: owner })
+
+      await createOrder(
+        erc721.address,
+        assetId,
+        web3.utils.toWei('10.0', 'ether'),
+        endTime,
+        {
+          from: seller,
+        }
+      )
+
+      await assertRevert(
+        executeOrder(erc721.address, assetId, web3.utils.toWei('10', 'ether'), {
+          from: buyer,
+        }),
+        'ERC20: transfer amount exceeds balance'
+      )
+    })
   })
 
   describe('Safe Execute', function() {
