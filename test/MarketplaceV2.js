@@ -154,7 +154,6 @@ contract('Marketplace V2', function([
   otherAddress,
   relayer,
   feesCollector,
-  royaltiesCollector,
   itemCreator,
   itemBeneficiary,
   anotherUser,
