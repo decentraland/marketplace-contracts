@@ -1962,7 +1962,7 @@ contract('Marketplace V2', function([
       await erc20.transfer(otherAddress, balance, { from: seller })
 
       // Set token balances
-      await erc20.setBalance(owner, web3.utils.toWei('10.0', 'ether'))
+      await erc20.setBalance(feesCollector, web3.utils.toWei('10.0', 'ether'))
       await erc20.setBalance(seller, web3.utils.toWei('10.0', 'ether'))
 
       let publicationFee = web3.utils.toWei('0.5', 'ether')
@@ -1972,9 +1972,11 @@ contract('Marketplace V2', function([
         from: seller,
       })
 
-      let balancePost = await erc20.balanceOf(seller)
+      let sellerBalance = await erc20.balanceOf(seller)
+      sellerBalance.should.be.eq.BN(web3.utils.toWei('9.5', 'ether'))
 
-      balancePost.should.be.eq.BN(web3.utils.toWei('9.5', 'ether'))
+      let feesCollectorBalance = await erc20.balanceOf(feesCollector)
+      feesCollectorBalance.should.be.eq.BN(web3.utils.toWei('10.5', 'ether'))
     })
 
     it('should publish with fee :: Relayed EIP721', async function() {
@@ -1982,7 +1984,7 @@ contract('Marketplace V2', function([
       await erc20.transfer(otherAddress, balance, { from: seller })
 
       // Set token balances
-      await erc20.setBalance(owner, web3.utils.toWei('10.0', 'ether'))
+      await erc20.setBalance(feesCollector, web3.utils.toWei('10.0', 'ether'))
       await erc20.setBalance(seller, web3.utils.toWei('10.0', 'ether'))
 
       let publicationFee = web3.utils.toWei('0.5', 'ether')
@@ -2031,9 +2033,11 @@ contract('Marketplace V2', function([
         version
       )
 
-      let balancePost = await erc20.balanceOf(seller)
+      let sellerBalance = await erc20.balanceOf(seller)
+      sellerBalance.should.be.eq.BN(web3.utils.toWei('9.5', 'ether'))
 
-      balancePost.should.be.eq.BN(web3.utils.toWei('9.5', 'ether'))
+      let feesCollectorBalance = await erc20.balanceOf(feesCollector)
+      feesCollectorBalance.should.be.eq.BN(web3.utils.toWei('10.5', 'ether'))
     })
   })
 

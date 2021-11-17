@@ -313,7 +313,7 @@ contract MarketplaceV2 is Ownable, Pausable, NativeMetaTransaction {
     // transfer the amount to marketplace owner
     if (publicationFeeInWei > 0) {
       require(
-        acceptedToken.transferFrom(sender, owner(), publicationFeeInWei),
+        acceptedToken.transferFrom(sender, feesCollector, publicationFeeInWei),
         "MarketplaceV2#_createOrder: TRANSFER_FAILED"
       );
     }
