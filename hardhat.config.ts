@@ -54,4 +54,7 @@ module.exports = {
     gasPrice: 21,
     showTimeSpent: true,
   },
+  etherscan: {
+    apiKey: process.env.ETHERSCAN_API_KEY
+  },
 }
