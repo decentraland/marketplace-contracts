@@ -22,18 +22,14 @@ enum MANA {
   'BSC_TESTNET' = '0x00cca1b48a7b41c57821492efd0e872984db5baa',
 }
 
-const FEES_COLLECTOR_CUT_PER_MILLION = 10000
-const ROYALTIES_CUT_PER_MILLION = 15000
-const ROYALTIES_MANAGER = ''
+const FEES_COLLECTOR_CUT_PER_MILLION = 0
+const ROYALTIES_CUT_PER_MILLION = 25000
+const ROYALTIES_MANAGER = '0x90958D4531258ca11D18396d4174a007edBc2b42'
 
 
 /**
  * @dev Steps:
- * Deploy the Collection implementation
- * Deploy the committee with the desired members. The owner will be the DAO bridge
- * Deploy the collection Manager. The owner will be the DAO bridge
- * Deploy the forwarder. Caller Is the collection manager.
- * Deploy the collection Factory. Owner is the forwarder.
+ * Deploy the Marketplace V2
  */
 async function main() {
   const owner = process.env['OWNER']
