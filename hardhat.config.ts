@@ -23,6 +23,15 @@ module.exports = {
           },
         },
       },
+      {
+        version: '0.8.10',
+        settings: {
+          optimizer: {
+            enabled: true,
+            runs: 1,
+          },
+        },
+      },
     ],
   },
   networks: {
@@ -44,5 +53,8 @@ module.exports = {
     currency: 'USD',
     gasPrice: 21,
     showTimeSpent: true,
+  },
+  etherscan: {
+    apiKey: process.env.ETHERSCAN_API_KEY
   },
 }

@@ -1,6 +1,8 @@
-pragma solidity ^0.7.6;
+// SPDX-License-Identifier: MIT
 
-import "@openzeppelin/contracts/math/SafeMath.sol";
+pragma solidity ^0.8.10;
+
+import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 
 import "./MarketplaceStorage.sol";
@@ -24,9 +26,7 @@ contract Marketplace is Ownable, Pausable, MarketplaceStorage, NativeMetaTransac
     address _acceptedToken,
     uint256 _ownerCutPerMillion,
     address _owner
-  )
-    public
-  {
+  )  {
     // EIP712 init
     _initializeEIP712('Decentraland Marketplace', '1');
 
