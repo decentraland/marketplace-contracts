@@ -21,6 +21,7 @@ interface ERC721Interface {
   function isApprovedForAll(address _owner, address _operator) external view returns (bool);
   function safeTransferFrom(address _from, address _to, uint256 _tokenId) external;
   function supportsInterface(bytes4) external view returns (bool);
+  function royaltyInfo(uint256 _tokenId, uint256 _salePrice) external view returns (address receiver, uint256 royaltyAmount, address royaltyRecipient);
 }
 
 

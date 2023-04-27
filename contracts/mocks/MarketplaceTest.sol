@@ -11,7 +11,7 @@ contract MarketplaceTest is Marketplace {
     uint256 _fee,
     address _owner
   ) Marketplace(
-    _acceptedToken,
+
     _fee,
     _owner
   ) {

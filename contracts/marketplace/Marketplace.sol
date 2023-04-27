@@ -18,17 +18,16 @@ contract Marketplace is Ownable, Pausable, MarketplaceStorage, NativeMetaTransac
 
   /**
     * @dev Initialize this contract. Acts as a constructor
-    * @param _acceptedToken - Address of the ERC20 accepted for this marketplace
     * @param _ownerCutPerMillion - owner cut per million
 
     */
   constructor (
-    address _acceptedToken,
+    // address _acceptedToken,
     uint256 _ownerCutPerMillion,
     address _owner
   )  {
     // EIP712 init
-    _initializeEIP712('Decentraland Marketplace', '1');
+    _initializeEIP712('MXC Marketplace', '1');
 
     // Fee init
     setOwnerCutPerMillion(_ownerCutPerMillion);
@@ -36,8 +35,8 @@ contract Marketplace is Ownable, Pausable, MarketplaceStorage, NativeMetaTransac
     require(_owner != address(0), "Invalid owner");
     transferOwnership(_owner);
 
-    require(_acceptedToken.isContract(), "The accepted token address must be a deployed contract");
-    acceptedToken = ERC20Interface(_acceptedToken);
+    // require(_acceptedToken.isContract(), "The accepted token address must be a deployed contract");
+    // acceptedToken = ERC20Interface(_acceptedToken);
   }
 
 
@@ -96,49 +95,92 @@ contract Marketplace is Ownable, Pausable, MarketplaceStorage, NativeMetaTransac
     _cancelOrder(nftAddress, assetId);
   }
 
-  /**
-    * @dev Executes the sale for a published NFT and checks for the asset fingerprint
-    * @param nftAddress - Address of the NFT registry
-    * @param assetId - ID of the published NFT
-    * @param price - Order price
-    * @param fingerprint - Verification info for the asset
-    */
-  function safeExecuteOrder(
-    address nftAddress,
-    uint256 assetId,
-    uint256 price,
-    bytes memory fingerprint
-  )
-   public
-   whenNotPaused
-  {
-    _executeOrder(
-      nftAddress,
-      assetId,
-      price,
-      fingerprint
-    );
-  }
+  // /**
+  //   * @dev Executes the sale for a published NFT and checks for the asset fingerprint
+  //   * @param nftAddress - Address of the NFT registry
+  //   * @param assetId - ID of the published NFT
+  //   * @param price - Order price
+  //   * @param fingerprint - Verification info for the asset
+  //   */
+  // function safeExecuteOrder(
+  //   address nftAddress,
+  //   uint256 assetId,
+  //   uint256 price,
+  //   bytes memory fingerprint
+  // )
+  //  public
+  //  payable
+  //  whenNotPaused
+  // {
+  //   _executeOrder(
+  //     nftAddress,
+  //     assetId,
+  //     price,
+  //     fingerprint
+  //   );
+  // }
 
   /**
     * @dev Executes the sale for a published NFT
     * @param nftAddress - Address of the NFT registry
     * @param assetId - ID of the published NFT
-    * @param price - Order price
     */
   function executeOrder(
     address nftAddress,
-    uint256 assetId,
-    uint256 price
+    uint256 assetId
   )
    public
+   payable
    whenNotPaused
   {
+     _requireERC721(nftAddress);
+
+    ERC721Verifiable nftRegistry = ERC721Verifiable(nftAddress);
+
+    // if (nftRegistry.supportsInterface(InterfaceId_ValidateFingerprint)) {
+    //   require(
+    //     nftRegistry.verifyFingerprint(assetId, ""),
+    //     "The asset fingerprint is not valid"
+    //   );
+    // }
+
+    Order memory order = orderByAssetId[nftAddress][assetId];
+    require(order.id != 0, "Asset not published");
+    // require(order.seller != address(0), "Invalid address");
+    require(order.seller != _msgSender(), "Unauthorized user");
+    require(order.price == msg.value, "The price is not correct");
+    require(block.timestamp < order.expiresAt, "The order expired");
+    // require(order.seller == nftRegistry.ownerOf(assetId), "The seller is no longer the owner");
+
+    uint saleShareAmount = 0;
+
+    // bytes32 orderId = order.id;
+    delete orderByAssetId[nftAddress][assetId];
+
+    if (ownerCutPerMillion > 0) {
+      // Calculate sale share
+      saleShareAmount = order.price.mul(ownerCutPerMillion).div(1000000);
+
+      (bool sentOwnerCut, bytes memory sentOwnerCutdata) = owner().call{value: saleShareAmount}("");
+      require(sentOwnerCut, "Transfering the cut to the Marketplace owner failed");
+    }
+
+    (address firstOwner, uint256 royaltyAmount, address royaltyRecipient) = nftRegistry.royaltyInfo(assetId, order.price.sub(saleShareAmount));
+    // Royalty payment
+    if(firstOwner != order.seller && royaltyAmount > 0 && royaltyRecipient != address(0)) {
+      (bool sentRoyalty, bytes memory sentRoyaltydata) = royaltyRecipient.call{value: royaltyAmount}("");
+      require(sentRoyalty, "Transfering the royalty to the royalty recipient failed");
+    }
+
+    (bool sent, bytes memory data) = order.seller.call{value: (order.price.sub(saleShareAmount).sub(royaltyAmount))}("");
+    require(sent, "Transfering the sale amount to the seller failed");
+    
     _executeOrder(
-      nftAddress,
-      assetId,
-      price,
-      ""
+     nftRegistry, 
+     assetId,    
+     order,
+     _msgSender(),
+     address(nftAddress)
     );
   }
 
@@ -165,12 +207,15 @@ contract Marketplace is Ownable, Pausable, MarketplaceStorage, NativeMetaTransac
     address assetOwner = nftRegistry.ownerOf(assetId);
 
     require(sender == assetOwner, "Only the owner can create orders");
-    require(
-      nftRegistry.getApproved(assetId) == address(this) || nftRegistry.isApprovedForAll(assetOwner, address(this)),
-      "The contract is not authorized to manage the asset"
-    );
+    // require(
+    //   nftRegistry.getApproved(assetId) == address(this) || nftRegistry.isApprovedForAll(assetOwner, address(this)),
+    //   "The contract is not authorized to manage the asset"
+    // );
     require(priceInWei > 0, "Price should be bigger than 0");
     require(expiresAt > block.timestamp.add(1 minutes), "Publication should be more than 1 minute in the future");
+  // require safeTransferFrom 
+
+    nftRegistry.safeTransferFrom(assetOwner, address(this), assetId);
 
     bytes32 orderId = keccak256(
       abi.encodePacked(
@@ -192,12 +237,13 @@ contract Marketplace is Ownable, Pausable, MarketplaceStorage, NativeMetaTransac
 
     // Check if there's a publication fee and
     // transfer the amount to marketplace owner
-    if (publicationFeeInWei > 0) {
-      require(
-        acceptedToken.transferFrom(sender, owner(), publicationFeeInWei),
-        "Transfering the publication fee to the Marketplace owner failed"
-      );
-    }
+    // if (publicationFeeInWei > 0) {
+      
+    //   require(
+    //     acceptedToken.transferFrom(sender, owner(), publicationFeeInWei),
+    //     "Transfering the publication fee to the Marketplace owner failed"
+    //   );
+    // }
 
     emit OrderCreated(
       orderId,
@@ -237,84 +283,34 @@ contract Marketplace is Ownable, Pausable, MarketplaceStorage, NativeMetaTransac
     return order;
   }
 
-  /**
-    * @dev Executes the sale for a published NFT
-    * @param nftAddress - Address of the NFT registry
-    * @param assetId - ID of the published NFT
-    * @param price - Order price
-    * @param fingerprint - Verification info for the asset
-    */
+  
   function _executeOrder(
-    address nftAddress,
+    ERC721Verifiable nftRegistry,
     uint256 assetId,
-    uint256 price,
-    bytes memory fingerprint
+    Order memory order, 
+    address sender,
+    address nftAddress
   )
-   internal returns (Order memory)
+   internal 
   {
-    _requireERC721(nftAddress);
-
-    address sender = _msgSender();
-
-    ERC721Verifiable nftRegistry = ERC721Verifiable(nftAddress);
-
-    if (nftRegistry.supportsInterface(InterfaceId_ValidateFingerprint)) {
-      require(
-        nftRegistry.verifyFingerprint(assetId, fingerprint),
-        "The asset fingerprint is not valid"
-      );
-    }
-    Order memory order = orderByAssetId[nftAddress][assetId];
-
-    require(order.id != 0, "Asset not published");
-
-    address seller = order.seller;
-
-    require(seller != address(0), "Invalid address");
-    require(seller != sender, "Unauthorized user");
-    require(order.price == price, "The price is not correct");
-    require(block.timestamp < order.expiresAt, "The order expired");
-    require(seller == nftRegistry.ownerOf(assetId), "The seller is no longer the owner");
-
-    uint saleShareAmount = 0;
-
-    bytes32 orderId = order.id;
-    delete orderByAssetId[nftAddress][assetId];
-
-    if (ownerCutPerMillion > 0) {
-      // Calculate sale share
-      saleShareAmount = price.mul(ownerCutPerMillion).div(1000000);
-
-      // Transfer share amount for marketplace Owner
-      require(
-        acceptedToken.transferFrom(sender, owner(), saleShareAmount),
-        "Transfering the cut to the Marketplace owner failed"
-      );
-    }
-
-    // Transfer sale amount to seller
-    require(
-      acceptedToken.transferFrom(sender, seller, price.sub(saleShareAmount)),
-      "Transfering the sale amount to the seller failed"
-    );
+   
 
     // Transfer asset owner
     nftRegistry.safeTransferFrom(
-      seller,
+      address(this),
       sender,
       assetId
     );
 
     emit OrderSuccessful(
-      orderId,
+      order.id,
       assetId,
-      seller,
+      order.seller,
       nftAddress,
-      price,
+      order.price,
       sender
     );
-
-    return order;
+    // return order;
   }
 
   function _requireERC721(address nftAddress) internal view {

@@ -1,4 +1,4 @@
-import { ethers } from "hardhat"
+import { ethers, run } from "hardhat"
 import * as ManaConfig from 'decentraland-mana/build/contracts/MANAToken.json'
 
 import {
@@ -34,30 +34,98 @@ const OWNER_CUT_PER_MILLION = 25000
  * Deploy the collection Factory. Owner is the forwarder.
  */
 async function main() {
-  const owner = process.env['OWNER']
+  const owner = "0x04451Fafe2FF1ab012aA16f9c3723e815b483055"
 
-  const network = NETWORKS[(process.env['NETWORK'] || 'LOCALHOST') as NETWORKS]
-  if (!network) {
-    throw ('Invalid network')
-  }
+  // const network = NETWORKS[(process.env['NETWORK'] || 'LOCALHOST') as NETWORKS]
+  // if (!network) {
+  //   throw ('Invalid network')
+  // }
 
   // Deploy collection marketplace
-  let acceptedToken: string = MANA[network]
+  // let acceptedToken: string = MANA[network]
 
-  if (network === 'LOCALHOST') {
-    const Mana = new ethers.ContractFactory(ManaConfig.abi, MANA_BYTECODE, ethers.provider.getSigner())
-    const mana = await Mana.deploy()
-    acceptedToken = mana.address
-  }
+  // if (network === 'LOCALHOST') {
+  //   const Mana = new ethers.ContractFactory(ManaConfig.abi, MANA_BYTECODE, ethers.provider.getSigner())
+  //   const mana = await Mana.deploy()
+  //   acceptedToken = mana.address
+  // }
 
-  const Marketplace = await ethers.getContractFactory("Marketplace")
-  const marketplace = await Marketplace.deploy(
-    acceptedToken,
-    OWNER_CUT_PER_MILLION,
-    owner,
-  )
+  // deploy Marketplace
+  // deploy NFT Factory
+  // deploy NFT Token
+  // Create NFT Collection from Factory
 
-  console.log('NFT Marketplace:', marketplace.address)
+  // const Marketplace = await ethers.getContractFactory("Marketplace")
+  // const marketplace = await Marketplace.deploy(
+  //   OWNER_CUT_PER_MILLION,
+  //   owner,
+  // )
+  // await marketplace.deployed()
+  // console.log('NFT Marketplace:', marketplace.address)
+
+
+  // // deply NFT Factory
+  // const NFTFactory = await ethers.getContractFactory("MXCCollectionFactoryV1");
+  // const nftFactory = await NFTFactory.deploy(
+  // )
+  // await nftFactory.deployed()
+  // console.log('NFT Factory:', nftFactory.address)
+
+
+  // // deploy NFT Token
+  // const NFTToken = await ethers.getContractFactory("MXCNFTTokenV1");
+  // const nftToken = await NFTToken.deploy(
+  //   marketplace.address
+  // )
+  // await nftToken.deployed()
+  // console.log('NFT Token:', nftToken.address)
+
+  // // Create NFT Collection from Factory
+  // const nftCollection = await nftFactory.createCollection(
+  //   marketplace.address,
+  //   "MXC Test Collection 1",
+  //   "MXC1",
+  //   true,
+  //   1000,
+  //   owner,
+  // )
+  // await nftCollection.wait()
+  // console.log('NFT Collection:', nftCollection.address)
+
+  // await new Promise((resolve) => setTimeout(resolve, 9000));
+
+  //   await run("verify:verify", {
+  //     address: marketplace.address,
+  //   });
+  //   await new Promise((resolve) => setTimeout(resolve, 5000));
+
+  //   await run("verify:verify", {
+  //     address: nftFactory.address,
+  //   });
+
+  //   await new Promise((resolve) => setTimeout(resolve, 5000));
+
+    await run("verify:verify", {
+
+      address:"0xB54e41072b8a70B6fbf33a2d4f8CbabBBf5D563f",
+    });
+
+  // await new Promise((resolve) => setTimeout(resolve, 5000));
+
+  //   await run("verify:verify", {
+  //     address: nftCollection.address,
+  //   });
+
+  /*
+  address _marketplaceAddress,
+        string memory _name,
+        string memory _symbol,
+        bool _wantRoyalties, 
+        uint256 _royaltyPercentage, 
+        address _royaltyRecipient
+  */
+
+  
 }
 
 main()
