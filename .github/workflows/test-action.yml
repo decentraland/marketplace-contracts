@@ -12,7 +12,7 @@ jobs:
 
     steps:
       - name: GPTReviewWorkflow
-        uses: sheenhx/GPT4ReviewWorkflow@main
+        uses: sheenhx/GPT4ReviewWorkflow@chunk
         with:
           GIT_COMMIT_HASH: ${{ github.event.pull_request.head.sha }}
           GIT_PATCH_OUTPUT: ${{ github.event.pull_request.patch_url }}
