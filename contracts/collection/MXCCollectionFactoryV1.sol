@@ -3,7 +3,7 @@ pragma solidity ^0.8.0;
 import "./MXCCollectionTokenV1.sol";
 contract MXCCollectionFactoryV1 is Ownable {
     MXCCollectionTokenV1[] public collectionAddressByIndex;
-    event newCollectionEvent(address collectionAddress, string name, address owner, string symbol);
+    event collection(address collectionAddress, string name, address owner, string symbol);
     constructor() {
     }
     function createCollection(
@@ -12,7 +12,8 @@ contract MXCCollectionFactoryV1 is Ownable {
         string memory _symbol,
         bool _wantRoyalties, 
         uint256 _royaltyPercentage, 
-        address _royaltyRecipient
+        address _royaltyRecipient,
+        address _lockingToken
     ) external  {
         MXCCollectionTokenV1 newCollection = new MXCCollectionTokenV1(
             _marketplaceAddress,
@@ -21,9 +22,10 @@ contract MXCCollectionFactoryV1 is Ownable {
             msg.sender,
             _wantRoyalties,
             _royaltyPercentage,
-            _royaltyRecipient
+            _royaltyRecipient,
+            _lockingToken
         );
         collectionAddressByIndex.push(newCollection);
-        emit newCollectionEvent(address(newCollection), _name, msg.sender, _symbol);
+        emit collection(address(newCollection), _name, msg.sender, _symbol);
     }
 }
