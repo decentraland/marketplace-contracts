@@ -47,10 +47,14 @@ module.exports = {
     },
     mxc: {
       url: 'https://wannsee-rpc.mxc.com',
-      accounts: ["272359c3e584dbf6dfcc755fffc53e5970b16020ca99e025071867014565cffb"],
+      accounts: ["4c60b210750d8125305ba772a9cac928dc80ad5d04b7e20045c156f4a1b5bae5"],
       // gas: 10000000,
       // gasPrice: 1000000000,
       // network_id: 5, // eslint-disable-line camelcase
+    },
+    polygontestnet: {
+      url: `https://rpc.ankr.com/polygon_mumbai`,
+      accounts: ["272359c3e584dbf6dfcc755fffc53e5970b16020ca99e025071867014565cffb"],
     },
     deploy: getDeployParams(),
   },

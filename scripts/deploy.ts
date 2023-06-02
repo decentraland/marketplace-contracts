@@ -34,7 +34,7 @@ const OWNER_CUT_PER_MILLION = 25000
  * Deploy the collection Factory. Owner is the forwarder.
  */
 async function main() {
-  const owner = "0x04451Fafe2FF1ab012aA16f9c3723e815b483055"
+  const owner = "0xc585365055A1e94f9585854C98283D7D40B5D91E"
 
   // const network = NETWORKS[(process.env['NETWORK'] || 'LOCALHOST') as NETWORKS]
   // if (!network) {
@@ -55,32 +55,33 @@ async function main() {
   // deploy NFT Token
   // Create NFT Collection from Factory
 
-  // const Marketplace = await ethers.getContractFactory("Marketplace")
-  // const marketplace = await Marketplace.deploy(
-  //   OWNER_CUT_PER_MILLION,
-  //   owner,
-  // )
-  // await marketplace.deployed()
-  // console.log('NFT Marketplace:', marketplace.address)
+  const Marketplace = await ethers.getContractFactory("MarketplaceV1")
+  const marketplace = await Marketplace.deploy(
+    OWNER_CUT_PER_MILLION,
+    owner,
+  )
+  await marketplace.deployed()
+  console.log('NFT Marketplace:', marketplace.address)
 
 
-  // // deply NFT Factory
-  // const NFTFactory = await ethers.getContractFactory("MXCCollectionFactoryV1");
-  // const nftFactory = await NFTFactory.deploy(
-  // )
-  // await nftFactory.deployed()
-  // console.log('NFT Factory:', nftFactory.address)
+  // deply NFT Factory
+  const NFTFactory = await ethers.getContractFactory("MXCCollectionFactoryV1");
+  const nftFactory = await NFTFactory.deploy(
+  )
+  await nftFactory.deployed()
+  console.log('NFT Factory:', nftFactory.address)
 
 
-  // // deploy NFT Token
-  // const NFTToken = await ethers.getContractFactory("MXCNFTTokenV1");
-  // const nftToken = await NFTToken.deploy(
-  //   marketplace.address
-  // )
-  // await nftToken.deployed()
-  // console.log('NFT Token:', nftToken.address)
+  // // // deploy NFT Token
+  const NFTToken = await ethers.getContractFactory("MXCNFTTokenV1");
+  const nftToken = await NFTToken.deploy(
+    marketplace.address,
+    marketplace.address
+  )
+  await nftToken.deployed()
+  console.log('NFT Token:', nftToken.address)
 
-  // // Create NFT Collection from Factory
+  // // // Create NFT Collection from Factory
   // const nftCollection = await nftFactory.createCollection(
   //   marketplace.address,
   //   "MXC Test Collection 1",
@@ -94,21 +95,28 @@ async function main() {
 
   // await new Promise((resolve) => setTimeout(resolve, 9000));
 
-  //   await run("verify:verify", {
-  //     address: marketplace.address,
-  //   });
-  //   await new Promise((resolve) => setTimeout(resolve, 5000));
+    // await run("verify:verify", {
+    //   address: "0x71022f23246E4b66fe1123d373138806E8a84AB1", // Marketplace
+    //   constructorArguments: [
+    //         25000,
+    //         "0x04451Fafe2FF1ab012aA16f9c3723e815b483055"
+    //       ],
+    // });
+    // await new Promise((resolve) => setTimeout(resolve, 5000));
 
-  //   await run("verify:verify", {
-  //     address: nftFactory.address,
-  //   });
+    // await run("verify:verify", {
+    //   address: "0x7FF8a18D192Ab5E594705FE27c8A26B3f3C86c4b", // NFT Factory
+    // });
 
-  //   await new Promise((resolve) => setTimeout(resolve, 5000));
+    // await new Promise((resolve) => setTimeout(resolve, 5000));
 
-    await run("verify:verify", {
+    // await run("verify:verify", {
 
-      address:"0xB54e41072b8a70B6fbf33a2d4f8CbabBBf5D563f",
-    });
+    //   address:"0x378307A3b265361Cd97af2293457ea6A31416D68", // NFT token
+    //   constructorArguments: [
+    //     "0x69403fF8e763fb99880C94745Cba6d83aB9916C7"
+    //   ],
+    // });
 
   // await new Promise((resolve) => setTimeout(resolve, 5000));
 
