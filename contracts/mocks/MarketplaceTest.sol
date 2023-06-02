@@ -2,15 +2,15 @@
 
 pragma solidity >0.4.23;
 
-import "../../contracts/marketplace/Marketplace.sol";
+import "../../contracts/marketplace/MarketplaceV1.sol";
 
 
-contract MarketplaceTest is Marketplace {
+contract MarketplaceTest is MarketplaceV1 {
   constructor (
     address _acceptedToken,
     uint256 _fee,
     address _owner
-  ) Marketplace(
+  ) MarketplaceV1(
 
     _fee,
     _owner
