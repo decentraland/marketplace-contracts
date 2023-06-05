@@ -1582,11 +1582,6 @@ contract  MXCNFTTokenV1  is ERC721Enumerable, Ownable, IMXCRoyaltyStandardV1
         _;
     }
 
-    // modifier onlyMarketplace(){
-    //     require(msg.sender == marketplaceContract, "NFT Token: Only marketplace is allowed for this action");
-    //     _;
-    // }
-
     function flipPauseStatus() public onlyOwner {
         isPaused = !isPaused;
     }
@@ -1595,7 +1590,7 @@ contract  MXCNFTTokenV1  is ERC721Enumerable, Ownable, IMXCRoyaltyStandardV1
      {
          marketplaceContract = _address;  
      }
-     // set locking token ffunciton
+     // set locking token funciton
     function setLockingToken(address _lockingToken) public onlyOwner
     {
         lockingToken = _lockingToken;  
