@@ -15,6 +15,10 @@ contract MXCCollectionFactoryV1 is Ownable {
         address _royaltyRecipient,
         address _lockingToken
     ) external  {
+        require(_marketplaceAddress != address(0), "Marketplace address cannot be 0");
+        require(_royaltyRecipient != address(0), "Royalty recipient address cannot be 0");
+        require(_royaltyPercentage <= 100 && _royaltyPercentage >= 0, "Royalty percentage cannot be greater than 100");
+        require(_lockingToken != address(0), "Locking token address cannot be 0");
         MXCCollectionTokenV1 newCollection = new MXCCollectionTokenV1(
             _marketplaceAddress,
             _name,

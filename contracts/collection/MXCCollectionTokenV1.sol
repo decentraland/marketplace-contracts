@@ -1558,6 +1558,8 @@ contract  MXCCollectionTokenV1  is ERC721Enumerable, Ownable, IMXCRoyaltyStandar
     // mapping(uint => string) private lockedURIs;
 
     event mint(address creator, uint tokenId,  string uri);
+    event burned(address owner, uint tokenId);
+    event LockingTokenChanged(address newLockingToken);
 
     mapping(uint256 => uint256) public lockedAmount;
 
@@ -1592,10 +1594,6 @@ contract  MXCCollectionTokenV1  is ERC721Enumerable, Ownable, IMXCRoyaltyStandar
     function flipPauseStatus() public onlyOwner {
         isPaused = !isPaused;
     }
-    //  function setMarketplaceAddress(address _address) public onlyOwner
-    //  {
-    //      marketplaceContract = _address;
-    //  }
 function mintToken(string memory _uri, bool _tokenLocking, uint256 _lockAmount) public onlyOwner isNotPaused{       
              uint256 currentTokenID = _tokenIdTracker.current().add(1);
              if(_tokenLocking){
@@ -1608,7 +1606,7 @@ function mintToken(string memory _uri, bool _tokenLocking, uint256 _lockAmount) 
             _tokenIdTracker.increment();
             emit mint( msg.sender, currentTokenID, _uri);
     }
-
+    // used to burn token and return the locked amount to the current owner
     function burn(uint256 _tokenId) public {
         require(_exists(_tokenId), "ERC721: burn nonexistent token");
         require(ownerOf(_tokenId) == msg.sender, "ERC721: burn caller is not owner");
@@ -1616,11 +1614,15 @@ function mintToken(string memory _uri, bool _tokenLocking, uint256 _lockAmount) 
         if(lockedAmount[_tokenId] > 0){
             IERC20(lockingToken).transferFrom(address(this), msg.sender, lockedAmount[_tokenId]);
         }
-    }
+        // emit burn event
+        emit burned(msg.sender, _tokenId);
 
+    }
+    // the token used to lock amount in
     function setLockingToken(address _lockingToken) public onlyOwner
     {
-        lockingToken = _lockingToken;  
+        lockingToken = _lockingToken; 
+        emit LockingTokenChanged(_lockingToken); 
     }
     function tokensOfOwner(address _owner) public view returns (uint256[] memory)
     {

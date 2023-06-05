@@ -35,9 +35,7 @@ contract MarketplaceV1 is Ownable, Pausable, MarketplaceStorage, NativeMetaTrans
     require(_owner != address(0), "Invalid owner");
     transferOwnership(_owner);
 
-    // require(_acceptedToken.isContract(), "The accepted token address must be a deployed contract");
-    // acceptedToken = ERC20Interface(_acceptedToken);
-  }
+ }
 
 
   /**
@@ -95,31 +93,6 @@ contract MarketplaceV1 is Ownable, Pausable, MarketplaceStorage, NativeMetaTrans
     _cancelOrder(nftAddress, assetId);
   }
 
-  // /**
-  //   * @dev Executes the sale for a published NFT and checks for the asset fingerprint
-  //   * @param nftAddress - Address of the NFT registry
-  //   * @param assetId - ID of the published NFT
-  //   * @param price - Order price
-  //   * @param fingerprint - Verification info for the asset
-  //   */
-  // function safeExecuteOrder(
-  //   address nftAddress,
-  //   uint256 assetId,
-  //   uint256 price,
-  //   bytes memory fingerprint
-  // )
-  //  public
-  //  payable
-  //  whenNotPaused
-  // {
-  //   _executeOrder(
-  //     nftAddress,
-  //     assetId,
-  //     price,
-  //     fingerprint
-  //   );
-  // }
-
   /**
     * @dev Executes the sale for a published NFT
     * @param nftAddress - Address of the NFT registry
@@ -136,14 +109,6 @@ contract MarketplaceV1 is Ownable, Pausable, MarketplaceStorage, NativeMetaTrans
      _requireERC721(nftAddress);
 
     ERC721Verifiable nftRegistry = ERC721Verifiable(nftAddress);
-
-    // if (nftRegistry.supportsInterface(InterfaceId_ValidateFingerprint)) {
-    //   require(
-    //     nftRegistry.verifyFingerprint(assetId, ""),
-    //     "The asset fingerprint is not valid"
-    //   );
-    // }
-
     Order memory order = orderByAssetId[nftAddress][assetId];
     require(order.id != 0, "Asset not published");
     // require(order.seller != address(0), "Invalid address");
@@ -207,13 +172,8 @@ contract MarketplaceV1 is Ownable, Pausable, MarketplaceStorage, NativeMetaTrans
     address assetOwner = nftRegistry.ownerOf(assetId);
 
     require(sender == assetOwner, "Only the owner can create orders");
-    // require(
-    //   nftRegistry.getApproved(assetId) == address(this) || nftRegistry.isApprovedForAll(assetOwner, address(this)),
-    //   "The contract is not authorized to manage the asset"
-    // );
     require(priceInWei > 0, "Price should be bigger than 0");
     require(expiresAt > block.timestamp.add(1 minutes), "Publication should be more than 1 minute in the future");
-  // require safeTransferFrom 
 
     nftRegistry.transferFrom(assetOwner, address(this), assetId);
 
@@ -234,16 +194,6 @@ contract MarketplaceV1 is Ownable, Pausable, MarketplaceStorage, NativeMetaTrans
       price: priceInWei,
       expiresAt: expiresAt
     });
-
-    // Check if there's a publication fee and
-    // transfer the amount to marketplace owner
-    // if (publicationFeeInWei > 0) {
-      
-    //   require(
-    //     acceptedToken.transferFrom(sender, owner(), publicationFeeInWei),
-    //     "Transfering the publication fee to the Marketplace owner failed"
-    //   );
-    // }
 
     emit OrderCreated(
       orderId,

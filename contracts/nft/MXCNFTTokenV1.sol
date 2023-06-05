@@ -1558,11 +1558,6 @@ contract  MXCNFTTokenV1  is ERC721Enumerable, Ownable, IMXCRoyaltyStandardV1
         bool wantRoyalties;
         address royaltyRecipient;
     }
-
-    // mapping(uint => bool) public wantRoyalties;
-    // mapping(uint => address ) public firstOwners;
-    // mapping(uint => uint) public royaltyPercentage;
-
     mapping(uint => Royalty) public royalties;
     mapping(uint => uint256) public lockedAmount;
 
