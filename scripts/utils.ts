@@ -15,7 +15,7 @@ export function getDeployParams() {
       initialIndex: 0,
       count: 10,
       path: `m/44'/60'/0'/0`
-    } : [process.env['PRIV_KEY'] ? process.env['PRIV_KEY'] : '0x12345678911111111111111111111111111111111111111111111111111111'],
+    } : [process.env['PRIV_KEY'] ? process.env['PRIV_KEY'] : '6f0b621d112674e93a65d1cd52f006d695aa9a4bc69d4270552d2f98e01dee5d'],
     gas: "auto",
     gasPrice: "auto",
     gasMultiplier: 1,
