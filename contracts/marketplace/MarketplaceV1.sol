@@ -243,8 +243,6 @@ contract MarketplaceV1 is Ownable, Pausable, MarketplaceStorage, NativeMetaTrans
   )
    internal 
   {
-   
-
     // Transfer asset owner
     nftRegistry.safeTransferFrom(
       address(this),
@@ -260,7 +258,6 @@ contract MarketplaceV1 is Ownable, Pausable, MarketplaceStorage, NativeMetaTrans
       order.price,
       sender
     );
-    // return order;
   }
 
   function _requireERC721(address nftAddress) internal view {

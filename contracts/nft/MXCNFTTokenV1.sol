@@ -1566,6 +1566,9 @@ contract  MXCNFTTokenV1  is ERC721Enumerable, Ownable, IMXCRoyaltyStandardV1
 
    
     constructor(address _mpAddress, address _lockingToken) ERC721("MXC Wanasee", "MXC")  {
+        // add require for both
+        require(_mpAddress != address(0), "NFT Token: Marketplace address can't be zero address");
+        require(_lockingToken != address(0), "NFT Token: Locking token can't be zero address");
         marketplaceContract = _mpAddress;
         lockingToken = _lockingToken;
     }
@@ -1593,6 +1596,7 @@ contract  MXCNFTTokenV1  is ERC721Enumerable, Ownable, IMXCRoyaltyStandardV1
      // set locking token funciton
     function setLockingToken(address _lockingToken) public onlyOwner
     {
+        require(_lockingToken != address(0), "NFT Token: Locking token can't be zero address");
         lockingToken = _lockingToken;  
     }
 
